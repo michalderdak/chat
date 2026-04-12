@@ -3,8 +3,10 @@ package grpcclient
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"google.golang.org/grpc"
@@ -16,17 +18,44 @@ import (
 )
 
 type Config struct {
-	Target  string
-	Token   string
-	UseTLS  bool
-	Timeout time.Duration
+	Target     string
+	Token      string
+	UseTLS     bool
+	CACert     string // path to CA certificate
+	ClientCert string // path to client certificate
+	ClientKey  string // path to client key
+	Timeout    time.Duration
 }
 
 func NewChatClient(cfg Config) (chatv1.ChatServiceClient, *grpc.ClientConn, error) {
 	var opts []grpc.DialOption
 
 	if cfg.UseTLS {
-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))
+		tlsCfg := &tls.Config{}
+
+		// Load CA cert to trust the server
+		if cfg.CACert != "" {
+			caCert, err := os.ReadFile(cfg.CACert)
+			if err != nil {
+				return nil, nil, fmt.Errorf("read CA cert: %w", err)
+			}
+			pool := x509.NewCertPool()
+			if !pool.AppendCertsFromPEM(caCert) {
+				return nil, nil, fmt.Errorf("failed to parse CA cert")
+			}
+			tlsCfg.RootCAs = pool
+		}
+
+		// Load client cert for mTLS
+		if cfg.ClientCert != "" && cfg.ClientKey != "" {
+			cert, err := tls.LoadX509KeyPair(cfg.ClientCert, cfg.ClientKey)
+			if err != nil {
+				return nil, nil, fmt.Errorf("load client cert: %w", err)
+			}
+			tlsCfg.Certificates = []tls.Certificate{cert}
+		}
+
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
 	} else {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}

@@ -104,7 +104,10 @@ client:
 	go run ./client/ --target localhost:50051 --token demo-token
 
 client-envoy:
-	go run ./client/ --target localhost:50052 --token demo-token --tls
+	go run ./client/ --target localhost:50052 --token demo-token --tls \
+		--ca-cert deploy/envoy/certs/generated/ca.crt \
+		--client-cert deploy/envoy/certs/generated/client.crt \
+		--client-key deploy/envoy/certs/generated/client.key
 
 # --- Demo Helpers ---
 

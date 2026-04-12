@@ -16,6 +16,9 @@ func main() {
 	target := flag.String("target", "localhost:50051", "gRPC server address")
 	token := flag.String("token", "demo-token", "Bearer token for auth")
 	useTLS := flag.Bool("tls", false, "Use TLS")
+	caCert := flag.String("ca-cert", "", "Path to CA certificate (for TLS)")
+	clientCert := flag.String("client-cert", "", "Path to client certificate (for mTLS)")
+	clientKey := flag.String("client-key", "", "Path to client key (for mTLS)")
 	timeout := flag.Duration("timeout", 30*time.Minute, "Stream timeout")
 	flag.Parse()
 
@@ -28,10 +31,13 @@ func main() {
 	log.SetOutput(logFile)
 
 	client, conn, err := grpcclient.NewChatClient(grpcclient.Config{
-		Target:  *target,
-		Token:   *token,
-		UseTLS:  *useTLS,
-		Timeout: *timeout,
+		Target:     *target,
+		Token:      *token,
+		UseTLS:     *useTLS,
+		CACert:     *caCert,
+		ClientCert: *clientCert,
+		ClientKey:  *clientKey,
+		Timeout:    *timeout,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to connect: %v\n", err)
