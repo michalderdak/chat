@@ -4,11 +4,22 @@ import structlog
 log = structlog.get_logger()
 
 
+_SKIP_AUTH_PREFIXES = (
+    "/grpc.health.v1.Health/",
+    "/grpc.reflection.v1alpha.ServerReflection/",
+    "/grpc.reflection.v1.ServerReflection/",
+)
+
+
 class AuthInterceptor(grpc.aio.ServerInterceptor):
     def __init__(self, token: str):
         self._token = token
 
     async def intercept_service(self, continuation, handler_call_details):
+        method = handler_call_details.method
+        if any(method.startswith(prefix) for prefix in _SKIP_AUTH_PREFIXES):
+            return await continuation(handler_call_details)
+
         metadata = dict(handler_call_details.invocation_metadata or [])
         auth_header = metadata.get("authorization", "")
 
