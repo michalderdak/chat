@@ -1,3 +1,4 @@
+import asyncio
 import time
 import grpc
 import structlog
@@ -20,7 +21,8 @@ class LoggingInterceptor(grpc.aio.ServerInterceptor):
 
             async def logged_unary(request, context):
                 try:
-                    response = await original(request, context)
+                    result = original(request, context)
+                    response = await result if asyncio.iscoroutine(result) else result
                     duration = round((time.monotonic() - start) * 1000, 2)
                     log.info("rpc.end", method=method, duration_ms=duration, status="OK")
                     return response

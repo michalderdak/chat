@@ -1,3 +1,4 @@
+import asyncio
 import grpc
 from opentelemetry import trace
 from opentelemetry.trace import StatusCode
@@ -26,7 +27,8 @@ class OTelInterceptor(grpc.aio.ServerInterceptor):
             async def traced_unary(request, context):
                 with tracer.start_as_current_span(method, kind=trace.SpanKind.SERVER) as span:
                     try:
-                        response = await original(request, context)
+                        result = original(request, context)
+                        response = await result if asyncio.iscoroutine(result) else result
                         span.set_status(StatusCode.OK)
                         return response
                     except Exception as e:

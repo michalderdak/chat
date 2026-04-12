@@ -1,3 +1,4 @@
+import asyncio
 import time
 import grpc
 from prometheus_client import Counter, Histogram, Gauge
@@ -21,7 +22,8 @@ class PrometheusInterceptor(grpc.aio.ServerInterceptor):
 
             async def metered_unary(request, context):
                 try:
-                    response = await original(request, context)
+                    result = original(request, context)
+                    response = await result if asyncio.iscoroutine(result) else result
                     GRPC_SERVER_HANDLED.labels(method=method, status="OK").inc()
                     GRPC_SERVER_DURATION.labels(method=method).observe(time.monotonic() - start)
                     return response
