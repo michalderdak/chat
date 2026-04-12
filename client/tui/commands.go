@@ -9,14 +9,19 @@ import (
 	"github.com/michal-derdak/chat/client/grpcclient"
 )
 
-// Bubble Tea messages
 type TokenMsg struct{ Text string }
 type StatusMsg struct{ Phase string }
 type ErrorMsg struct{ Err error }
 type StreamEndMsg struct{}
 type AckMsg struct{ Type string }
+type HeartbeatMsg struct{ Beat string }
+type UsageMsg struct {
+	PromptTokens     int
+	CompletionTokens int
+	ContextLength    int
+}
+type EventLogMsg struct{ Entry EventEntry }
 
-// WaitForEvent returns a command that blocks on the next server event.
 func WaitForEvent(sc *grpcclient.StreamClient) tea.Cmd {
 	return func() tea.Msg {
 		resp, err := sc.Recv()
@@ -37,14 +42,19 @@ func WaitForEvent(sc *grpcclient.StreamClient) tea.Cmd {
 		case *chatv1.ChatResponse_Ack:
 			return AckMsg{Type: evt.Ack.GetAcknowledgedType()}
 		case *chatv1.ChatResponse_Heartbeat:
-			return StatusMsg{Phase: "heartbeat"}
+			return HeartbeatMsg{Beat: evt.Heartbeat.GetBeat()}
+		case *chatv1.ChatResponse_Usage:
+			return UsageMsg{
+				PromptTokens:     int(evt.Usage.GetPromptTokens()),
+				CompletionTokens: int(evt.Usage.GetCompletionTokens()),
+				ContextLength:    int(evt.Usage.GetContextLength()),
+			}
 		default:
 			return nil
 		}
 	}
 }
 
-// SendMessage sends a user message on the bidi stream.
 func SendMessage(sc *grpcclient.StreamClient, conversationID, text string) tea.Cmd {
 	return func() tea.Msg {
 		err := sc.Send(&chatv1.ChatRequest{
@@ -56,11 +66,14 @@ func SendMessage(sc *grpcclient.StreamClient, conversationID, text string) tea.C
 		if err != nil && err != io.EOF {
 			return ErrorMsg{Err: fmt.Errorf("send: %w", err)}
 		}
-		return nil
+		return EventLogMsg{Entry: EventEntry{
+			Dir:     Outgoing,
+			Type:    "UserMessage",
+			Payload: fmt.Sprintf("%q", truncate(text, 30)),
+		}}
 	}
 }
 
-// SendCancel sends a cancel signal on the bidi stream.
 func SendCancel(sc *grpcclient.StreamClient, conversationID string) tea.Cmd {
 	return func() tea.Msg {
 		err := sc.Send(&chatv1.ChatRequest{
@@ -72,6 +85,9 @@ func SendCancel(sc *grpcclient.StreamClient, conversationID string) tea.Cmd {
 		if err != nil && err != io.EOF {
 			return ErrorMsg{Err: fmt.Errorf("send cancel: %w", err)}
 		}
-		return nil
+		return EventLogMsg{Entry: EventEntry{
+			Dir:  Outgoing,
+			Type: "CancelGeneration",
+		}}
 	}
 }
