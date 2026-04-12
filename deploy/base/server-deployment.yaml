@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: chat-server
+  template:
+    metadata:
+      labels:
+        app: chat-server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      containers:
+        - name: chat-server
+          image: chat-server:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 50051
+              name: grpc
+            - containerPort: 9090
+              name: metrics
+          env:
+            - name: GRPC_PORT
+              value: "50051"
+            - name: METRICS_PORT
+              value: "9090"
+            - name: OLLAMA_URL
+              value: "http://ollama:11434"
+            - name: OLLAMA_MODEL
+              value: "qwen3:0.6b"
+            - name: AUTH_ENABLED
+              value: "true"
+            - name: AUTH_TOKEN
+              value: "demo-token"
+            - name: OTEL_ENABLED
+              value: "true"
+            - name: OTEL_ENDPOINT
+              value: "otel-collector.observability.svc.cluster.local:4317"
+          readinessProbe:
+            grpc:
+              port: 50051
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            grpc:
+              port: 50051
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
