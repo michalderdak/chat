@@ -254,20 +254,50 @@ func (m Model) View() string {
 }
 
 func (m Model) renderMessages() string {
+	width := m.chatViewport.Width
+	if width < 10 {
+		width = 40
+	}
 	var b strings.Builder
 	for i, msg := range m.messages {
+		var prefix, content string
 		switch msg.Role {
 		case "user":
-			b.WriteString(UserStyle.Render("You: "))
-			b.WriteString(msg.Content)
+			prefix = UserStyle.Render("You: ")
+			content = msg.Content
 		case "assistant":
-			b.WriteString(AssistantStyle.Render("AI: "))
-			b.WriteString(msg.Content)
+			prefix = AssistantStyle.Render("AI: ")
+			content = msg.Content
 			if m.streaming && i == len(m.messages)-1 {
-				b.WriteString("▌")
+				content += "▌"
 			}
 		}
+		b.WriteString(prefix)
+		b.WriteString(wordWrap(content, width-6))
 		b.WriteString("\n\n")
+	}
+	return b.String()
+}
+
+func wordWrap(s string, width int) string {
+	if width <= 0 {
+		return s
+	}
+	var b strings.Builder
+	col := 0
+	for _, r := range s {
+		if r == '\n' {
+			b.WriteRune(r)
+			col = 0
+			continue
+		}
+		if col >= width && r == ' ' {
+			b.WriteRune('\n')
+			col = 0
+			continue
+		}
+		b.WriteRune(r)
+		col++
 	}
 	return b.String()
 }
