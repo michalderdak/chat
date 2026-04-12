@@ -18,7 +18,7 @@ RUN touch gen/python/__init__.py gen/python/chat/__init__.py gen/python/chat/v1/
 # Copy server source
 COPY server/src server/src
 
-ENV PYTHONPATH=/app/gen/python
+ENV PYTHONPATH=/app/gen/python:/app/server/src
 WORKDIR /app/server
 
 CMD ["uv", "run", "--no-sync", "python", "-m", "chat_server.main"]
