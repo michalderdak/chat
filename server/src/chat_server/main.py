@@ -49,6 +49,7 @@ async def serve():
         ollama_url=settings.ollama_url,
         ollama_model=settings.ollama_model,
     )
+    await servicer.initialize()
     chat_pb2_grpc.add_ChatServiceServicer_to_server(servicer, server)
 
     # Register health service

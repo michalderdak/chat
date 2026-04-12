@@ -23,7 +23,7 @@ def mock_context():
 async def test_send_message(servicer, mock_context):
     from chat.v1 import chat_pb2
 
-    async def fake_chat(msg, history=None):
+    async def fake_chat(msg, conversation_history=None):
         for token in ["Hello", " from", " Ollama"]:
             yield token
 
@@ -40,7 +40,7 @@ async def test_send_message_error(servicer, mock_context):
     """SendMessage should call context.abort on Ollama errors."""
     from chat.v1 import chat_pb2
 
-    async def failing_chat(msg, history=None):
+    async def failing_chat(msg, conversation_history=None):
         raise RuntimeError("connection refused")
         # Make it an async generator
         yield  # pragma: no cover
@@ -60,7 +60,7 @@ async def test_chat_streaming(servicer, mock_context):
     """Chat bidi streaming should emit status updates and tokens."""
     from chat.v1 import chat_pb2
 
-    async def fake_chat(msg, history=None):
+    async def fake_chat(msg, conversation_history=None):
         for token in ["Hi", " there"]:
             yield token
 
@@ -95,7 +95,7 @@ async def test_chat_cancel(servicer, mock_context):
 
     generation_started = asyncio.Event()
 
-    async def slow_chat(msg, history=None):
+    async def slow_chat(msg, conversation_history=None):
         generation_started.set()
         for token in ["a", "b", "c", "d", "e"]:
             await asyncio.sleep(0.05)
