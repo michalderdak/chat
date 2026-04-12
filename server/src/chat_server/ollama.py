@@ -7,7 +7,9 @@ import httpx
 class OllamaClient:
     def __init__(self, base_url: str = "http://localhost:11434", model: str = "qwen3:0.6b"):
         self._model = model
-        self._client = httpx.AsyncClient(base_url=base_url, timeout=120.0)
+        self._client = httpx.AsyncClient(
+            base_url=base_url, timeout=120.0, headers={"Host": "localhost"}
+        )
 
     async def chat(self, message: str, conversation_history: list[dict] | None = None) -> AsyncIterator[str]:
         """Stream chat tokens from Ollama."""
