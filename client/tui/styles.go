@@ -21,4 +21,12 @@ var (
 
 	InputPromptStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("205"))
+
+	PanelBorderStyle = lipgloss.NewStyle().
+				Border(lipgloss.NormalBorder()).
+				BorderForeground(lipgloss.Color("240"))
+
+	PanelTitleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("248")).
+			Bold(true)
 )
