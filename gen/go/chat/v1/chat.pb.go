@@ -418,6 +418,7 @@ type ChatResponse struct {
 	//	*ChatResponse_Error
 	//	*ChatResponse_Heartbeat
 	//	*ChatResponse_Ack
+	//	*ChatResponse_Usage
 	Event         isChatResponse_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -512,6 +513,15 @@ func (x *ChatResponse) GetAck() *Acknowledgement {
 	return nil
 }
 
+func (x *ChatResponse) GetUsage() *UsageInfo {
+	if x != nil {
+		if x, ok := x.Event.(*ChatResponse_Usage); ok {
+			return x.Usage
+		}
+	}
+	return nil
+}
+
 type isChatResponse_Event interface {
 	isChatResponse_Event()
 }
@@ -536,6 +546,10 @@ type ChatResponse_Ack struct {
 	Ack *Acknowledgement `protobuf:"bytes,6,opt,name=ack,proto3,oneof"`
 }
 
+type ChatResponse_Usage struct {
+	Usage *UsageInfo `protobuf:"bytes,7,opt,name=usage,proto3,oneof"`
+}
+
 func (*ChatResponse_Token) isChatResponse_Event() {}
 
 func (*ChatResponse_Status) isChatResponse_Event() {}
@@ -545,6 +559,8 @@ func (*ChatResponse_Error) isChatResponse_Event() {}
 func (*ChatResponse_Heartbeat) isChatResponse_Event() {}
 
 func (*ChatResponse_Ack) isChatResponse_Event() {}
+
+func (*ChatResponse_Usage) isChatResponse_Event() {}
 
 type Token struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -688,6 +704,7 @@ func (x *Error) GetMessage() string {
 
 type Heartbeat struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Beat          string                 `protobuf:"bytes,1,opt,name=beat,proto3" json:"beat,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -720,6 +737,13 @@ func (x *Heartbeat) ProtoReflect() protoreflect.Message {
 // Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
 func (*Heartbeat) Descriptor() ([]byte, []int) {
 	return file_chat_v1_chat_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Heartbeat) GetBeat() string {
+	if x != nil {
+		return x.Beat
+	}
+	return ""
 }
 
 type Acknowledgement struct {
@@ -766,6 +790,66 @@ func (x *Acknowledgement) GetAcknowledgedType() string {
 	return ""
 }
 
+type UsageInfo struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	PromptTokens     int32                  `protobuf:"varint,1,opt,name=prompt_tokens,json=promptTokens,proto3" json:"prompt_tokens,omitempty"`
+	CompletionTokens int32                  `protobuf:"varint,2,opt,name=completion_tokens,json=completionTokens,proto3" json:"completion_tokens,omitempty"`
+	ContextLength    int32                  `protobuf:"varint,3,opt,name=context_length,json=contextLength,proto3" json:"context_length,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *UsageInfo) Reset() {
+	*x = UsageInfo{}
+	mi := &file_chat_v1_chat_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UsageInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UsageInfo) ProtoMessage() {}
+
+func (x *UsageInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UsageInfo.ProtoReflect.Descriptor instead.
+func (*UsageInfo) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *UsageInfo) GetPromptTokens() int32 {
+	if x != nil {
+		return x.PromptTokens
+	}
+	return 0
+}
+
+func (x *UsageInfo) GetCompletionTokens() int32 {
+	if x != nil {
+		return x.CompletionTokens
+	}
+	return 0
+}
+
+func (x *UsageInfo) GetContextLength() int32 {
+	if x != nil {
+		return x.ContextLength
+	}
+	return 0
+}
+
 var File_chat_v1_chat_proto protoreflect.FileDescriptor
 
 const file_chat_v1_chat_proto_rawDesc = "" +
@@ -788,14 +872,15 @@ const file_chat_v1_chat_proto_rawDesc = "" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"\x12\n" +
 	"\x10CancelGeneration\"&\n" +
 	"\x10ContextInjection\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"\xa3\x02\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"\xcf\x02\n" +
 	"\fChatResponse\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12&\n" +
 	"\x05token\x18\x02 \x01(\v2\x0e.chat.v1.TokenH\x00R\x05token\x12/\n" +
 	"\x06status\x18\x03 \x01(\v2\x15.chat.v1.StatusUpdateH\x00R\x06status\x12&\n" +
 	"\x05error\x18\x04 \x01(\v2\x0e.chat.v1.ErrorH\x00R\x05error\x122\n" +
 	"\theartbeat\x18\x05 \x01(\v2\x12.chat.v1.HeartbeatH\x00R\theartbeat\x12,\n" +
-	"\x03ack\x18\x06 \x01(\v2\x18.chat.v1.AcknowledgementH\x00R\x03ackB\a\n" +
+	"\x03ack\x18\x06 \x01(\v2\x18.chat.v1.AcknowledgementH\x00R\x03ack\x12*\n" +
+	"\x05usage\x18\a \x01(\v2\x12.chat.v1.UsageInfoH\x00R\x05usageB\a\n" +
 	"\x05event\"\x1b\n" +
 	"\x05Token\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"4\n" +
@@ -803,10 +888,15 @@ const file_chat_v1_chat_proto_rawDesc = "" +
 	"\x05phase\x18\x01 \x01(\x0e2\x0e.chat.v1.PhaseR\x05phase\"5\n" +
 	"\x05Error\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\v\n" +
-	"\tHeartbeat\">\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x1f\n" +
+	"\tHeartbeat\x12\x12\n" +
+	"\x04beat\x18\x01 \x01(\tR\x04beat\">\n" +
 	"\x0fAcknowledgement\x12+\n" +
-	"\x11acknowledged_type\x18\x01 \x01(\tR\x10acknowledgedType*X\n" +
+	"\x11acknowledged_type\x18\x01 \x01(\tR\x10acknowledgedType\"\x84\x01\n" +
+	"\tUsageInfo\x12#\n" +
+	"\rprompt_tokens\x18\x01 \x01(\x05R\fpromptTokens\x12+\n" +
+	"\x11completion_tokens\x18\x02 \x01(\x05R\x10completionTokens\x12%\n" +
+	"\x0econtext_length\x18\x03 \x01(\x05R\rcontextLength*X\n" +
 	"\x05Phase\x12\x15\n" +
 	"\x11PHASE_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0ePHASE_THINKING\x10\x01\x12\x14\n" +
@@ -830,7 +920,7 @@ func file_chat_v1_chat_proto_rawDescGZIP() []byte {
 }
 
 var file_chat_v1_chat_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_chat_v1_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_chat_v1_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_chat_v1_chat_proto_goTypes = []any{
 	(Phase)(0),                  // 0: chat.v1.Phase
 	(*SendMessageRequest)(nil),  // 1: chat.v1.SendMessageRequest
@@ -845,6 +935,7 @@ var file_chat_v1_chat_proto_goTypes = []any{
 	(*Error)(nil),               // 10: chat.v1.Error
 	(*Heartbeat)(nil),           // 11: chat.v1.Heartbeat
 	(*Acknowledgement)(nil),     // 12: chat.v1.Acknowledgement
+	(*UsageInfo)(nil),           // 13: chat.v1.UsageInfo
 }
 var file_chat_v1_chat_proto_depIdxs = []int32{
 	4,  // 0: chat.v1.ChatRequest.user_message:type_name -> chat.v1.UserMessage
@@ -855,16 +946,17 @@ var file_chat_v1_chat_proto_depIdxs = []int32{
 	10, // 5: chat.v1.ChatResponse.error:type_name -> chat.v1.Error
 	11, // 6: chat.v1.ChatResponse.heartbeat:type_name -> chat.v1.Heartbeat
 	12, // 7: chat.v1.ChatResponse.ack:type_name -> chat.v1.Acknowledgement
-	0,  // 8: chat.v1.StatusUpdate.phase:type_name -> chat.v1.Phase
-	1,  // 9: chat.v1.ChatService.SendMessage:input_type -> chat.v1.SendMessageRequest
-	3,  // 10: chat.v1.ChatService.Chat:input_type -> chat.v1.ChatRequest
-	2,  // 11: chat.v1.ChatService.SendMessage:output_type -> chat.v1.SendMessageResponse
-	7,  // 12: chat.v1.ChatService.Chat:output_type -> chat.v1.ChatResponse
-	11, // [11:13] is the sub-list for method output_type
-	9,  // [9:11] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	13, // 8: chat.v1.ChatResponse.usage:type_name -> chat.v1.UsageInfo
+	0,  // 9: chat.v1.StatusUpdate.phase:type_name -> chat.v1.Phase
+	1,  // 10: chat.v1.ChatService.SendMessage:input_type -> chat.v1.SendMessageRequest
+	3,  // 11: chat.v1.ChatService.Chat:input_type -> chat.v1.ChatRequest
+	2,  // 12: chat.v1.ChatService.SendMessage:output_type -> chat.v1.SendMessageResponse
+	7,  // 13: chat.v1.ChatService.Chat:output_type -> chat.v1.ChatResponse
+	12, // [12:14] is the sub-list for method output_type
+	10, // [10:12] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_chat_v1_chat_proto_init() }
@@ -883,6 +975,7 @@ func file_chat_v1_chat_proto_init() {
 		(*ChatResponse_Error)(nil),
 		(*ChatResponse_Heartbeat)(nil),
 		(*ChatResponse_Ack)(nil),
+		(*ChatResponse_Usage)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -890,7 +983,7 @@ func file_chat_v1_chat_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chat_v1_chat_proto_rawDesc), len(file_chat_v1_chat_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

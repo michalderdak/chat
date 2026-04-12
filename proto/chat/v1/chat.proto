@@ -60,6 +60,7 @@ message ChatResponse {
     Error error = 4;
     Heartbeat heartbeat = 5;
     Acknowledgement ack = 6;
+    UsageInfo usage = 7;
   }
 }
 
@@ -83,8 +84,16 @@ message Error {
   string message = 2;
 }
 
-message Heartbeat {}
+message Heartbeat {
+  string beat = 1;
+}
 
 message Acknowledgement {
   string acknowledged_type = 1;
+}
+
+message UsageInfo {
+  int32 prompt_tokens = 1;
+  int32 completion_tokens = 2;
+  int32 context_length = 3;
 }

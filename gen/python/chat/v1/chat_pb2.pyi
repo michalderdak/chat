@@ -62,20 +62,22 @@ class ContextInjection(_message.Message):
     def __init__(self, text: _Optional[str] = ...) -> None: ...
 
 class ChatResponse(_message.Message):
-    __slots__ = ("conversation_id", "token", "status", "error", "heartbeat", "ack")
+    __slots__ = ("conversation_id", "token", "status", "error", "heartbeat", "ack", "usage")
     CONVERSATION_ID_FIELD_NUMBER: _ClassVar[int]
     TOKEN_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
     HEARTBEAT_FIELD_NUMBER: _ClassVar[int]
     ACK_FIELD_NUMBER: _ClassVar[int]
+    USAGE_FIELD_NUMBER: _ClassVar[int]
     conversation_id: str
     token: Token
     status: StatusUpdate
     error: Error
     heartbeat: Heartbeat
     ack: Acknowledgement
-    def __init__(self, conversation_id: _Optional[str] = ..., token: _Optional[_Union[Token, _Mapping]] = ..., status: _Optional[_Union[StatusUpdate, _Mapping]] = ..., error: _Optional[_Union[Error, _Mapping]] = ..., heartbeat: _Optional[_Union[Heartbeat, _Mapping]] = ..., ack: _Optional[_Union[Acknowledgement, _Mapping]] = ...) -> None: ...
+    usage: UsageInfo
+    def __init__(self, conversation_id: _Optional[str] = ..., token: _Optional[_Union[Token, _Mapping]] = ..., status: _Optional[_Union[StatusUpdate, _Mapping]] = ..., error: _Optional[_Union[Error, _Mapping]] = ..., heartbeat: _Optional[_Union[Heartbeat, _Mapping]] = ..., ack: _Optional[_Union[Acknowledgement, _Mapping]] = ..., usage: _Optional[_Union[UsageInfo, _Mapping]] = ...) -> None: ...
 
 class Token(_message.Message):
     __slots__ = ("text",)
@@ -98,11 +100,23 @@ class Error(_message.Message):
     def __init__(self, code: _Optional[int] = ..., message: _Optional[str] = ...) -> None: ...
 
 class Heartbeat(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("beat",)
+    BEAT_FIELD_NUMBER: _ClassVar[int]
+    beat: str
+    def __init__(self, beat: _Optional[str] = ...) -> None: ...
 
 class Acknowledgement(_message.Message):
     __slots__ = ("acknowledged_type",)
     ACKNOWLEDGED_TYPE_FIELD_NUMBER: _ClassVar[int]
     acknowledged_type: str
     def __init__(self, acknowledged_type: _Optional[str] = ...) -> None: ...
+
+class UsageInfo(_message.Message):
+    __slots__ = ("prompt_tokens", "completion_tokens", "context_length")
+    PROMPT_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    COMPLETION_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    CONTEXT_LENGTH_FIELD_NUMBER: _ClassVar[int]
+    prompt_tokens: int
+    completion_tokens: int
+    context_length: int
+    def __init__(self, prompt_tokens: _Optional[int] = ..., completion_tokens: _Optional[int] = ..., context_length: _Optional[int] = ...) -> None: ...
