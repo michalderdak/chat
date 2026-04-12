@@ -36,11 +36,22 @@ class LoggingInterceptor(grpc.aio.ServerInterceptor):
         if handler.stream_stream:
             original = handler.stream_stream
 
+            async def _log_request_iterator(request_iterator):
+                """Wrap the client request iterator to log incoming messages."""
+                msg_num = 0
+                async for msg in request_iterator:
+                    msg_num += 1
+                    action = msg.WhichOneof("action") if hasattr(msg, "WhichOneof") else "unknown"
+                    log.info("stream.recv", method=method, msg_num=msg_num, action=action)
+                    yield msg
+
             async def logged_stream(request_iterator, context):
                 msg_count = 0
                 try:
-                    async for response in original(request_iterator, context):
+                    async for response in original(_log_request_iterator(request_iterator), context):
                         msg_count += 1
+                        event_type = response.WhichOneof("event") if hasattr(response, "WhichOneof") else "unknown"
+                        log.info("stream.send", method=method, msg_num=msg_count, event=event_type)
                         yield response
                     duration = round((time.monotonic() - start) * 1000, 2)
                     log.info("rpc.end", method=method, duration_ms=duration, status="OK", server_messages=msg_count)
