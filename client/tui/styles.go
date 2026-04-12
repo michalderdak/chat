@@ -1,0 +1,24 @@
+package tui
+
+import "github.com/charmbracelet/lipgloss"
+
+var (
+	UserStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("10")).
+			Bold(true)
+
+	AssistantStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("12"))
+
+	StatusBarStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("236")).
+			Foreground(lipgloss.Color("248")).
+			Padding(0, 1)
+
+	ErrorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("9")).
+			Bold(true)
+
+	InputPromptStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("205"))
+)
