@@ -37,3 +37,35 @@ async def test_chat_streams_tokens(client):
             tokens.append(token)
 
     assert tokens == ["Hello", " world", "!"]
+
+
+@pytest.mark.asyncio
+async def test_chat_returns_usage_stats(client):
+    """The final done:true chunk should yield usage stats."""
+    lines = [
+        json.dumps({"message": {"content": "Hi"}, "done": False}),
+        json.dumps({
+            "message": {"content": ""},
+            "done": True,
+            "prompt_eval_count": 11,
+            "eval_count": 5,
+        }),
+    ]
+    mock_response = AsyncMock()
+    mock_response.raise_for_status = MagicMock()
+
+    async def fake_aiter_lines():
+        for line in lines:
+            yield line
+
+    mock_response.aiter_lines = fake_aiter_lines
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=False)
+
+    with patch.object(client._client, "stream", return_value=mock_response):
+        tokens = []
+        async for token in client.chat("test"):
+            tokens.append(token)
+
+    assert tokens == ["Hi"]
+    assert client.last_usage == {"prompt_eval_count": 11, "eval_count": 5}
