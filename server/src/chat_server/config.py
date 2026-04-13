@@ -13,6 +13,7 @@ class Settings:
     auth_token: str = os.getenv("AUTH_TOKEN", "demo-token")
     otel_endpoint: str = os.getenv("OTEL_ENDPOINT", "localhost:4317")
     otel_enabled: bool = os.getenv("OTEL_ENABLED", "false").lower() == "true"
+    redis_url: str = os.getenv("REDIS_URL", "redis://redis:6379")
 
 
 settings = Settings()

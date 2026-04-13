@@ -61,6 +61,7 @@ message ChatResponse {
     Heartbeat heartbeat = 5;
     Acknowledgement ack = 6;
     UsageInfo usage = 7;
+    ServerShutdown shutdown = 8;
   }
 }
 
@@ -96,4 +97,19 @@ message UsageInfo {
   int32 prompt_tokens = 1;
   int32 completion_tokens = 2;
   int32 context_length = 3;
+}
+
+message ServerShutdown {
+  string reason = 1;
+}
+
+// --- Storage messages (Redis serialization) ---
+
+message ConversationMessage {
+  string role = 1;
+  string content = 2;
+}
+
+message ConversationHistory {
+  repeated ConversationMessage messages = 1;
 }
