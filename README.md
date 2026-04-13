@@ -72,13 +72,6 @@ make logs-envoy      # Server logs (chat-envoy namespace)
 make cluster-clean   # Delete Kind cluster
 ```
 
-## Presentation
-
-```bash
-brew install slides
-slides presentation/slides.md
-```
-
 ## Project Structure
 
 ```
@@ -90,5 +83,4 @@ deploy/base/                — K8s base manifests (server, gateway, Redis, PDB)
 deploy/grpc/                — chat-grpc namespace (bearer token auth)
 deploy/envoy/               — chat-envoy namespace (Envoy mTLS + headless LB)
 deploy/observability/       — Prometheus, Jaeger, OTEL Collector
-presentation/slides.md      — Terminal slide deck (slides CLI)
 ```
