@@ -69,20 +69,6 @@ async def serve():
     ]
     reflection.enable_server_reflection(service_names, server)
 
-    # Also register reflection under v1 path for grpcurl 1.9+ compatibility
-    # grpcurl tries grpc.reflection.v1 first, falls back to v1alpha
-    from grpc_reflection.v1alpha import reflection_pb2 as _rpb2
-    v1_handlers = {
-        "ServerReflectionInfo": grpc.stream_stream_rpc_method_handler(
-            reflection.aio.ReflectionServicer(service_names).ServerReflectionInfo,
-            request_deserializer=_rpb2.ServerReflectionRequest.FromString,
-            response_serializer=_rpb2.ServerReflectionResponse.SerializeToString,
-        ),
-    }
-    server.add_generic_rpc_handlers(
-        [grpc.method_handlers_generic_handler("grpc.reflection.v1.ServerReflection", v1_handlers)]
-    )
-
     start_http_server(settings.metrics_port)
 
     listen_addr = f"[::]:{settings.grpc_port}"

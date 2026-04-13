@@ -44,6 +44,8 @@ spec:
               value: "true"
             - name: OTEL_ENDPOINT
               value: "otel-collector.observability.svc.cluster.local:4317"
+            - name: PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION
+              value: "python"
           lifecycle:
             preStop:
               exec:
