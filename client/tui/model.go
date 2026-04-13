@@ -291,9 +291,9 @@ func (m Model) View() string {
 }
 
 func (m Model) renderMessages() string {
-	width := m.chatViewport.Width
-	if width < 10 {
-		width = 40
+	wrapWidth := m.chatViewport.Width - 4
+	if wrapWidth < 10 {
+		wrapWidth = 40
 	}
 	var b strings.Builder
 	for i, msg := range m.messages {
@@ -313,7 +313,7 @@ func (m Model) renderMessages() string {
 			content = ErrorStyle.Render(msg.Content)
 		}
 		b.WriteString(prefix)
-		b.WriteString(wordWrap(content, width-6))
+		b.WriteString(wordWrap(content, wrapWidth-6))
 		b.WriteString("\n\n")
 	}
 	return b.String()
@@ -343,9 +343,13 @@ func wordWrap(s string, width int) string {
 }
 
 func (m Model) renderEventLog() string {
+	wrapWidth := m.eventViewport.Width - 4
+	if wrapWidth < 10 {
+		wrapWidth = 40
+	}
 	var b strings.Builder
 	for _, e := range m.eventLog {
-		b.WriteString(e.Render())
+		b.WriteString(wordWrap(e.Render(), wrapWidth))
 		b.WriteString("\n")
 	}
 	return b.String()
