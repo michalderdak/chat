@@ -101,7 +101,7 @@ TCP Connection
 
 ---
 
-# Protobuf as Contract
+# Proto as Contract
 
 ```protobuf
 syntax = "proto3";
@@ -113,26 +113,27 @@ message SendMessageRequest {
 }
 ```
 
-**JSON**: `{"conversation_id":"abc","text":"hello"}` -- 44 bytes, field names every time
-
-**Protobuf**: `[0x0A 03 "abc"][0x12 05 "hello"]` -- 14 bytes, tag + value only
-
-```
-Tag = (field_number << 3) | wire_type
-Field 1: (1 << 3) | 2 = 0x0A   -- "conversation_id" becomes 1 byte
-Field 2: (2 << 3) | 2 = 0x12   -- "text" becomes 1 byte
-```
-
 - Field numbers are the wire identity -- names can change, numbers cannot
 - **Safe changes**: add fields, add enum values, deprecate fields
 - **Breaking changes**: reuse numbers, change types, remove fields
 - Both sides need the `.proto` schema to decode -- trade-off: readability vs compact + fast
 
+
+**JSON**: `{"conversation_id":"abc","text":"hello"}` -- field names every time
+
+**Protobuf**: `[0x0A 03 "abc"][0x12 05 "hello"]` -- tag + value only
+
+---
+
+# Let's Look at our Proto Definition
+
+![](../proto/chat/v1/chat.proto)
+
 ---
 
 # Buf Ecosystem
 
-Our config: `buf.yaml` and `buf.gen.yaml`
+https://buf.build/
 
 ```yaml
 # buf.yaml
@@ -152,6 +153,8 @@ plugins:
 - `buf lint` -- enforces naming, numbering, package structure in CI
 - `buf breaking --against .git#branch=main` -- catches breaking changes before merge
 - `buf generate` -- one command produces Go + Python + Gateway code
+
+*`make generate`*
 
 ---
 
