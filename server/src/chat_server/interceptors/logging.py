@@ -51,7 +51,7 @@ class LoggingInterceptor(grpc.aio.ServerInterceptor):
                     async for response in original(_log_request_iterator(request_iterator), context):
                         msg_count += 1
                         event_type = response.WhichOneof("event") if hasattr(response, "WhichOneof") else "unknown"
-                        log.info("stream.send", method=method, msg_num=msg_count, event=event_type)
+                        log.info("stream.send", method=method, msg_num=msg_count, event_type=event_type)
                         yield response
                     duration = round((time.monotonic() - start) * 1000, 2)
                     log.info("rpc.end", method=method, duration_ms=duration, status="OK", server_messages=msg_count)
