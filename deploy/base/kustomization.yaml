@@ -6,3 +6,6 @@ resources:
   - server-service.yaml
   - gateway-deployment.yaml
   - gateway-service.yaml
+  - redis-deployment.yaml
+  - redis-service.yaml
+  - pdb.yaml
