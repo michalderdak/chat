@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -51,7 +53,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	model := tui.NewModel(client, stream, "conversation-1", *timeout)
+	idBytes := make([]byte, 8)
+	rand.Read(idBytes)
+	conversationID := "chat-" + hex.EncodeToString(idBytes)
+
+	model := tui.NewModel(client, stream, conversationID, *timeout)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
