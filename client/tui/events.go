@@ -32,6 +32,8 @@ var (
 	IncomingUsageStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
 	IncomingShutdownStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
 	OutgoingReconnectStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true)
+	OutgoingSendMsgStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	IncomingResponseStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
 	ArrowOutStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true)
 	ArrowInStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
 )
@@ -66,6 +68,8 @@ func (e EventEntry) styleForType() lipgloss.Style {
 			return OutgoingContextStyle
 		case "Reconnected":
 			return OutgoingReconnectStyle
+		case "SendMessage":
+			return OutgoingSendMsgStyle
 		}
 		return OutgoingUserMsgStyle
 	}
@@ -85,6 +89,8 @@ func (e EventEntry) styleForType() lipgloss.Style {
 		return IncomingUsageStyle
 	case "ServerShutdown":
 		return IncomingShutdownStyle
+	case "Response":
+		return IncomingResponseStyle
 	}
 	return IncomingTokenStyle
 }

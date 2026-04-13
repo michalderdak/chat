@@ -1,4 +1,5 @@
 import asyncio
+import os
 import grpc
 import structlog
 from chat.v1 import chat_pb2, chat_pb2_grpc
@@ -64,6 +65,8 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
             full_response = ""
             async for token in self._ollama.chat(request.text):
                 full_response += token
+            hostname = os.environ.get("HOSTNAME", "unknown")
+            await context.set_trailing_metadata([("x-served-by", hostname)])
             return chat_pb2.SendMessageResponse(
                 conversation_id=request.conversation_id,
                 text=full_response,
