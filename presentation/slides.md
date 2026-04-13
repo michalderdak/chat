@@ -209,22 +209,26 @@ oneof action {
 
 ---
 
-# Demo: Live Bidi Chat
+# Demo: Unified TUI -- One Client, Four Modes
 
 ```bash
-make client
+make client  # Single command, two gRPC connections, four tabs
 ```
 
-Split-screen TUI:
-- **Left panel**: chat messages with word wrapping
-- **Right panel**: gRPC event log showing every protocol message
-- **Status bar**: pod name, token usage, streaming state
+```
+┌─[gRPC Unary]─[gRPC Stream]─[Envoy Unary]─[Envoy Stream]─┐
+│  Chat (gRPC Stream)     │  gRPC Event Log                 │
+│  You: Hey               │  → UserMessage "Hey"            │
+│  AI: Hello! ...         │  ← StatusUpdate GENERATING      │
+├─────────────────────────┴─────────────────────────────────┤
+│ gRPC Stream | pod: chat-server-abc | streaming            │
+└───────────────────────────────────────────────────────────┘
+```
 
-Try:
-1. Send a message -- watch StatusUpdate and Token events flow
-2. Press **Ctrl+C** mid-generation -- see CancelGeneration -> Ack
-3. Type new message while AI is streaming -- auto-cancel + new generation
-4. Watch **Heartbeat** events with playful words every 15 seconds
+- **Tab** cycles: gRPC Unary → gRPC Stream → Envoy Unary → Envoy Stream
+- Two connections (plaintext + mTLS) share HTTP/2 multiplexing
+- Background streams keep running when tabbed away
+- Each tab has independent chat history and event log
 
 ---
 
@@ -417,6 +421,29 @@ if strings.Contains(err, "Unavailable") {
 
 ---
 
+# HTTP/2 Multiplexing in Action
+
+Our unified client demonstrates HTTP/2 multiplexing:
+
+```
+grpcConn (1 TCP connection to localhost:50051)
+ +-- Stream: gRPC Unary SendMessage RPCs
+ +-- Stream: gRPC Bidi Chat stream (tokens flowing)
+ +-- Stream: Health checks
+
+envoyConn (1 TCP connection to localhost:50052)
+ +-- Stream: Envoy Unary SendMessage RPCs
+ +-- Stream: Envoy Bidi Chat stream (tokens flowing)
+```
+
+- Two TCP connections total, not four
+- Unary and streaming RPCs coexist on the same connection
+- Tab to "gRPC Stream", start chatting, tab to "gRPC Unary", send a message
+- Both work simultaneously -- multiplexed on one connection
+- This is WHY gRPC uses HTTP/2 -- impossible with HTTP/1.1
+
+---
+
 # Envoy as gRPC Proxy
 
 ```
@@ -487,25 +514,28 @@ The `chat-grpc` namespace keeps regular ClusterIP -- demonstrating pick-first be
 
 # Demo: Unary Load Balancing -- Envoy vs Direct
 
-```bash
-# Envoy namespace: round-robin -- different pod each request
-make unary-envoy
-# Send 3-4 messages, watch event log:
-#   <- Response (chat-server-5md2x) 1.2s
-#   <- Response (chat-server-9zstr) 0.9s   <-- different pod!
-#   <- Response (chat-server-hp78l) 1.1s   <-- different pod!
+In the unified TUI (`make client`), switch tabs to compare:
+
+**Tab: Envoy Unary** -- round-robin, different pod each request:
+```
+→ SendMessage "Hey"
+← Response (chat-server-5md2x) 1.2s
+→ SendMessage "Hello"
+← Response (chat-server-9zstr) 0.9s   <-- different pod!
+→ SendMessage "Hi"
+← Response (chat-server-hp78l) 1.1s   <-- different pod!
 ```
 
-```bash
-# Pure gRPC namespace: pick-first -- same pod every time
-make unary-grpc
-# Send 3-4 messages, watch event log:
-#   <- Response (chat-server-dbk28) 1.0s
-#   <- Response (chat-server-dbk28) 0.8s   <-- same pod
-#   <- Response (chat-server-dbk28) 1.2s   <-- same pod
+**Tab: gRPC Unary** -- pick-first, same pod every time:
+```
+→ SendMessage "Hey"
+← Response (chat-server-dbk28) 1.0s
+→ SendMessage "Hello"
+← Response (chat-server-dbk28) 0.8s   <-- same pod
 ```
 
-The pod name is returned via gRPC trailing metadata (`x-served-by`).
+Pod name returned via gRPC trailing metadata (`x-served-by`).
+Same connection, same TUI -- just switch tabs to see the difference.
 
 ---
 
@@ -529,8 +559,9 @@ openssl x509 -req -CA ca.crt -CAkey ca.key -out client.crt
 ```
 
 ```bash
-# Client passes certs via flags:
-make client-envoy  # --ca-cert, --client-cert, --client-key
+# Unified client passes both connection configs:
+make client  # --grpc-target + --envoy-target with certs
+# Switch to Envoy tabs to use mTLS connection
 ```
 
 ---
@@ -621,22 +652,20 @@ Protobuf for everything -- not just RPC, also storage.
 
 # Client Auto-Reconnect
 
-`client/tui/model.go`
+`client/tui/unified_model.go`
 
 ```go
 case ShutdownMsg:
-    // Server says "I'm going away"
-    m.messages = append(m.messages,
-        ChatMessage{Role: "system", Content: "[Server restarting, reconnecting...]"})
-    m.reconnecting = true
-    return m, m.reconnectCmd()
+    mode.Messages = append(mode.Messages,
+        ChatMessage{Role: "system",
+            Content: "[Server restarting, reconnecting...]"})
+    mode.Reconnecting = true
+    return m, withMode(idx, m.reconnectCmd(idx))
 
 case ReconnectedMsg:
-    // New stream opened to a different pod
-    m.stream = msg.Stream
-    m.podName = m.stream.PodName()
-    m.status = fmt.Sprintf("reconnected to %s", m.podName)
-    return m, WaitForEvent(m.stream)
+    mode.Stream = inner.Stream
+    mode.PodName = mode.Stream.PodName()
+    return m, withMode(idx, WaitForEvent(mode.Stream))
 ```
 
 Key insight: new stream carries the same `conversation_id`.
@@ -648,7 +677,7 @@ New pod loads history from Redis. AI remembers the conversation.
 
 Terminal 1:
 ```bash
-make client  # Start bidi chat, send a few messages
+make client  # Tab to "gRPC Stream", send a few messages
 ```
 
 Terminal 2:
@@ -656,12 +685,12 @@ Terminal 2:
 kubectl -n chat-grpc rollout restart deployment/chat-server
 ```
 
-Watch the TUI:
+Watch the gRPC Stream tab:
 1. AI finishes its current response (not cut off!)
 2. Event log: `<- ServerShutdown "pod draining"`
 3. Chat: `[Server restarting, reconnecting...]`
 4. Event log: `-> Reconnected chat-server-NEW-POD`
-5. Send another message -- AI remembers the conversation
+5. Send another message -- AI remembers the conversation (Redis)
 
 ---
 
@@ -777,10 +806,9 @@ OTEL Collector --> Jaeger (traces)     localhost:16686
 make cluster         # Create Kind cluster
 make deploy-all      # Deploy everything (builds, loads, restarts)
 
-make client          # Bidi streaming TUI (chat-grpc)
-make client-envoy    # Bidi streaming TUI via Envoy (mTLS)
-make unary-grpc      # Unary TUI (chat-grpc, pick-first)
-make unary-envoy     # Unary TUI via Envoy (round-robin)
+make client          # Unified TUI: 4 tabs, 2 connections
+                     # Tab: gRPC Unary | gRPC Stream
+                     #       Envoy Unary | Envoy Stream
 
 make grpcurl-list    # Service discovery via reflection
 make grpcurl-health  # Health check
