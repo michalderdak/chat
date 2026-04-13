@@ -6,9 +6,19 @@ from chat_server.service import ChatServiceServicer
 
 
 @pytest.fixture
-def servicer():
+def mock_history():
+    store = MagicMock()
+    store.save = AsyncMock()
+    store.load = AsyncMock(return_value=[])
+    return store
+
+
+@pytest.fixture
+def servicer(mock_history):
     return ChatServiceServicer(
-        ollama_url="http://fake:11434", ollama_model="qwen3:0.6b"
+        ollama_url="http://fake:11434",
+        ollama_model="qwen3:0.6b",
+        history_store=mock_history,
     )
 
 
