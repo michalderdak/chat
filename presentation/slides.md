@@ -15,6 +15,25 @@ Deployed on Kubernetes with Envoy proxy
 
 ---
 
+# About Me
+
+Working at **Visma** on two gRPC services running in production on GKE with Istio:
+
+**Smartscan** -- Document scanning & extraction API
+- ~20 million document scans per month
+- gRPC service inside Istio service mesh
+
+**Autosuggest** -- Generic classifier for transactional data
+- ~26 million prediction calls per month
+- Hosts up to 700,000 models
+
+Both services:
+- Hosted on **GKE** inside **Istio** service mesh
+- gRPC with connections to BigQuery, Cloud Storage, and Spanner
+- Production experience that informs everything in this talk
+
+---
+
 # Agenda
 
 1. gRPC Fundamentals -- what, why, and how it works under the hood
