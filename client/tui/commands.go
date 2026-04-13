@@ -21,7 +21,9 @@ type UsageMsg struct {
 	ContextLength    int
 }
 type ShutdownMsg struct{ Reason string }
-type ReconnectedMsg struct{}
+type ReconnectedMsg struct {
+	Stream *grpcclient.StreamClient
+}
 type EventLogMsg struct{ Entry EventEntry }
 
 func WaitForEvent(sc *grpcclient.StreamClient) tea.Cmd {

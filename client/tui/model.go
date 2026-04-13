@@ -30,6 +30,7 @@ type Model struct {
 	stream         *grpcclient.StreamClient
 	conversationID string
 	streaming      bool
+	reconnecting   bool
 	status         string
 	err            error
 
@@ -121,21 +122,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.addEvent(EventEntry{Dir: Incoming, Type: "ServerShutdown", Payload: fmt.Sprintf("%q", msg.Reason)})
 		m.messages = append(m.messages, ChatMessage{Role: "system", Content: "[Server restarting, reconnecting...]"})
 		m.streaming = false
+		m.reconnecting = true
 		m.status = "reconnecting..."
 		m.refreshPanels()
 		return m, m.reconnectCmd()
 
 	case ReconnectedMsg:
+		m.stream = msg.Stream
+		m.reconnecting = false
 		m.addEvent(EventEntry{Dir: Outgoing, Type: "Reconnected"})
 		m.status = "reconnected"
 		m.refreshPanels()
 		return m, WaitForEvent(m.stream)
 
 	case ErrorMsg:
+		// Ignore errors while reconnecting (old stream dying)
+		if m.reconnecting {
+			return m, nil
+		}
 		m.addEvent(EventEntry{Dir: Incoming, Type: "Error", Payload: msg.Err.Error()})
 		m.streaming = false
 		if strings.Contains(msg.Err.Error(), "Unavailable") || strings.Contains(msg.Err.Error(), "EOF") || strings.Contains(msg.Err.Error(), "transport is closing") {
 			m.messages = append(m.messages, ChatMessage{Role: "system", Content: "[Connection lost, reconnecting...]"})
+			m.reconnecting = true
 			m.status = "reconnecting..."
 			m.refreshPanels()
 			return m, m.reconnectCmd()
@@ -235,15 +244,17 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *Model) reconnectCmd() tea.Cmd {
+func (m Model) reconnectCmd() tea.Cmd {
+	oldStream := m.stream
+	client := m.grpcClient
+	timeout := m.timeout
 	return func() tea.Msg {
-		m.stream.Close()
-		newStream, err := grpcclient.OpenStream(m.grpcClient, m.timeout)
+		oldStream.Close()
+		newStream, err := grpcclient.OpenStream(client, timeout)
 		if err != nil {
 			return ErrorMsg{Err: fmt.Errorf("reconnect failed: %w", err)}
 		}
-		m.stream = newStream
-		return ReconnectedMsg{}
+		return ReconnectedMsg{Stream: newStream}
 	}
 }
 
