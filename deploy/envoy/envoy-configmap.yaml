@@ -62,6 +62,8 @@ data:
           lb_policy: ROUND_ROBIN
           connect_timeout: 30s
           dns_lookup_family: V4_ONLY
+          preconnect_policy:
+            per_upstream_preconnect_ratio: 3.0
           typed_extension_protocol_options:
             envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
               "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
