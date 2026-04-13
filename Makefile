@@ -1,5 +1,6 @@
 .PHONY: generate docker lint breaking cluster build load deploy-grpc deploy-envoy \
         deploy-observability deploy-all client client-envoy \
+        unary-grpc unary-envoy \
         certs clean cluster-clean \
         grpcurl-list grpcurl-health grpcurl-send curl-send \
         logs-grpc logs-envoy logs-envoy-proxy
@@ -107,6 +108,15 @@ client:
 
 client-envoy:
 	go run ./client/ --target localhost:50052 --token demo-token --tls \
+		--ca-cert deploy/envoy/certs/generated/ca.crt \
+		--client-cert deploy/envoy/certs/generated/client.crt \
+		--client-key deploy/envoy/certs/generated/client.key
+
+unary-grpc:
+	go run ./client/ --unary --target localhost:50051 --token demo-token
+
+unary-envoy:
+	go run ./client/ --unary --target localhost:50052 --token demo-token --tls \
 		--ca-cert deploy/envoy/certs/generated/ca.crt \
 		--client-cert deploy/envoy/certs/generated/client.crt \
 		--client-key deploy/envoy/certs/generated/client.key

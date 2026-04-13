@@ -22,6 +22,7 @@ func main() {
 	clientCert := flag.String("client-cert", "", "Path to client certificate (for mTLS)")
 	clientKey := flag.String("client-key", "", "Path to client key (for mTLS)")
 	timeout := flag.Duration("timeout", 30*time.Minute, "Stream timeout")
+	unary := flag.Bool("unary", false, "Use unary RPCs instead of bidi streaming")
 	flag.Parse()
 
 	logFile, err := os.OpenFile("client.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
@@ -47,18 +48,24 @@ func main() {
 	}
 	defer conn.Close()
 
-	stream, err := grpcclient.OpenStream(client, *timeout)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to open stream: %v\n", err)
-		os.Exit(1)
-	}
-
 	idBytes := make([]byte, 8)
 	rand.Read(idBytes)
 	conversationID := "chat-" + hex.EncodeToString(idBytes)
 
-	model := tui.NewModel(client, stream, conversationID, *timeout)
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	var p *tea.Program
+	if *unary {
+		model := tui.NewUnaryModel(client, conversationID)
+		p = tea.NewProgram(model, tea.WithAltScreen())
+	} else {
+		stream, err := grpcclient.OpenStream(client, *timeout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to open stream: %v\n", err)
+			os.Exit(1)
+		}
+		model := tui.NewModel(client, stream, conversationID, *timeout)
+		p = tea.NewProgram(model, tea.WithAltScreen())
+	}
+
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
