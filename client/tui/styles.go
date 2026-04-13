@@ -29,4 +29,18 @@ var (
 	PanelTitleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("248")).
 			Bold(true)
+
+	TabActiveStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("15")).
+			Background(lipgloss.Color("62")).
+			Padding(0, 2)
+
+	TabInactiveStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			Background(lipgloss.Color("236")).
+			Padding(0, 2)
+
+	TabBarStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("236"))
 )
