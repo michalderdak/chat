@@ -75,6 +75,9 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
             await context.abort(grpc.StatusCode.INTERNAL, str(e))
 
     async def Chat(self, request_iterator, context):
+        hostname = os.environ.get("HOSTNAME", "unknown")
+        await context.send_initial_metadata([("x-served-by", hostname)])
+
         send_queue: asyncio.Queue = asyncio.Queue()
         cancel_event = asyncio.Event()
 

@@ -29,6 +29,7 @@ type Model struct {
 	timeout        time.Duration
 	stream         *grpcclient.StreamClient
 	conversationID string
+	podName        string
 	streaming      bool
 	reconnecting   bool
 	status         string
@@ -49,11 +50,14 @@ func NewModel(grpcClient chatv1.ChatServiceClient, stream *grpcclient.StreamClie
 	ti.Focus()
 	ti.Width = 80
 
+	podName := stream.PodName()
+
 	return Model{
 		input:          ti,
 		messages:       []ChatMessage{},
-		eventLog:       []EventEntry{},
-		status:         "connected",
+		eventLog:       []EventEntry{{Dir: Incoming, Type: "Connected", Payload: podName}},
+		status:         fmt.Sprintf("connected to %s", podName),
+		podName:        podName,
 		grpcClient:     grpcClient,
 		stream:         stream,
 		conversationID: conversationID,
@@ -130,8 +134,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ReconnectedMsg:
 		m.stream = msg.Stream
 		m.reconnecting = false
-		m.addEvent(EventEntry{Dir: Outgoing, Type: "Reconnected"})
-		m.status = "reconnected"
+		m.podName = m.stream.PodName()
+		m.addEvent(EventEntry{Dir: Outgoing, Type: "Reconnected", Payload: m.podName})
+		m.status = fmt.Sprintf("reconnected to %s", m.podName)
 		m.refreshPanels()
 		return m, WaitForEvent(m.stream)
 
@@ -295,7 +300,7 @@ func (m Model) View() string {
 		usageStr = fmt.Sprintf("tokens: %d/%d (%.1f%%) | ", total, m.contextLength, pct)
 	}
 	statusBar := StatusBarStyle.Width(m.width).Render(
-		fmt.Sprintf(" %s%s | streaming: %v", usageStr, m.status, m.streaming),
+		fmt.Sprintf(" %s%s | pod: %s | streaming: %v", usageStr, m.status, m.podName, m.streaming),
 	)
 
 	return fmt.Sprintf("%s\n%s\n%s", panels, statusBar, m.input.View())

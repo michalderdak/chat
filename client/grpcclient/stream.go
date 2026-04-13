@@ -42,3 +42,15 @@ func (s *StreamClient) Close() {
 func (s *StreamClient) IsEOF(err error) bool {
 	return err == io.EOF
 }
+
+// PodName returns the x-served-by value from initial metadata (response headers).
+func (s *StreamClient) PodName() string {
+	md, err := s.stream.Header()
+	if err != nil {
+		return "unknown"
+	}
+	if vals := md.Get("x-served-by"); len(vals) > 0 {
+		return vals[0]
+	}
+	return "unknown"
+}

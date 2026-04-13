@@ -66,7 +66,7 @@ func (e EventEntry) styleForType() lipgloss.Style {
 			return OutgoingCancelStyle
 		case "ContextInjection":
 			return OutgoingContextStyle
-		case "Reconnected":
+		case "Reconnected", "Connected":
 			return OutgoingReconnectStyle
 		case "SendMessage":
 			return OutgoingSendMsgStyle
