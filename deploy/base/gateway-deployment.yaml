@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chat-gateway
+  template:
+    metadata:
+      labels:
+        app: chat-gateway
+    spec:
+      containers:
+        - name: chat-gateway
+          image: chat-gateway:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+              name: http
+          args:
+            - "--grpc-addr=chat-server:50051"
+            - "--http-addr=:8080"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"

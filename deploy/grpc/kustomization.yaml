@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: chat-grpc
+resources:
+  - namespace.yaml
+  - ../base
+patches:
+  - path: server-service-nodeport.yaml
+  - path: gateway-service-nodeport.yaml
