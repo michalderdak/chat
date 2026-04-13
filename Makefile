@@ -76,6 +76,7 @@ deploy-observability:
 
 deploy-grpc: load
 	kubectl apply -k deploy/grpc/
+	kubectl -n chat-grpc rollout restart deployment/chat-server deployment/chat-gateway
 	@echo "Waiting for rollout..."
 	kubectl -n chat-grpc rollout status deployment/chat-server --timeout=120s
 	kubectl -n chat-grpc rollout status deployment/chat-gateway --timeout=120s
@@ -88,6 +89,7 @@ deploy-envoy: load certs
 		--from-file=server.key=deploy/envoy/certs/generated/server.key \
 		--dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply -k deploy/envoy/
+	kubectl -n chat-envoy rollout restart deployment/chat-server deployment/envoy
 	@echo "Waiting for rollout..."
 	kubectl -n chat-envoy rollout status deployment/chat-server --timeout=120s
 	kubectl -n chat-envoy rollout status deployment/envoy --timeout=120s
