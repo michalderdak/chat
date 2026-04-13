@@ -39,6 +39,12 @@ data:
                         - name: chat
                           domains: ["*"]
                           routes:
+                            # Unary RPC — 30s timeout
+                            - match: { path: "/chat.v1.ChatService/SendMessage" }
+                              route:
+                                cluster: chat_service
+                                timeout: 30s
+                            # Bidi streaming — no timeout, long-lived
                             - match: { prefix: "/" }
                               route:
                                 cluster: chat_service
