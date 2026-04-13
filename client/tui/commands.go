@@ -20,6 +20,8 @@ type UsageMsg struct {
 	CompletionTokens int
 	ContextLength    int
 }
+type ShutdownMsg struct{ Reason string }
+type ReconnectedMsg struct{}
 type EventLogMsg struct{ Entry EventEntry }
 
 func WaitForEvent(sc *grpcclient.StreamClient) tea.Cmd {
@@ -49,6 +51,8 @@ func WaitForEvent(sc *grpcclient.StreamClient) tea.Cmd {
 				CompletionTokens: int(evt.Usage.GetCompletionTokens()),
 				ContextLength:    int(evt.Usage.GetContextLength()),
 			}
+		case *chatv1.ChatResponse_Shutdown:
+			return ShutdownMsg{Reason: evt.Shutdown.GetReason()}
 		default:
 			return nil
 		}

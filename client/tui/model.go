@@ -3,11 +3,13 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	chatv1 "github.com/michal-derdak/chat/gen/go/chat/v1"
 	"github.com/michal-derdak/chat/client/grpcclient"
 )
 
@@ -23,6 +25,8 @@ type Model struct {
 	messages      []ChatMessage
 	eventLog      []EventEntry
 
+	grpcClient     chatv1.ChatServiceClient
+	timeout        time.Duration
 	stream         *grpcclient.StreamClient
 	conversationID string
 	streaming      bool
@@ -38,7 +42,7 @@ type Model struct {
 	height int
 }
 
-func NewModel(stream *grpcclient.StreamClient, conversationID string) Model {
+func NewModel(grpcClient chatv1.ChatServiceClient, stream *grpcclient.StreamClient, conversationID string, timeout time.Duration) Model {
 	ti := textinput.New()
 	ti.Placeholder = "Type a message... (Enter to send, Esc to quit)"
 	ti.Focus()
@@ -49,8 +53,10 @@ func NewModel(stream *grpcclient.StreamClient, conversationID string) Model {
 		messages:       []ChatMessage{},
 		eventLog:       []EventEntry{},
 		status:         "connected",
+		grpcClient:     grpcClient,
 		stream:         stream,
 		conversationID: conversationID,
+		timeout:        timeout,
 	}
 }
 
@@ -69,7 +75,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case TokenMsg:
-		m.addEvent(EventEntry{Dir: Incoming, Type: "Token", Payload: fmt.Sprintf("%q", truncate(msg.Text, 30))})
 		if len(m.messages) > 0 {
 			last := &m.messages[len(m.messages)-1]
 			if last.Role == "assistant" {
@@ -112,10 +117,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshPanels()
 		return m, WaitForEvent(m.stream)
 
+	case ShutdownMsg:
+		m.addEvent(EventEntry{Dir: Incoming, Type: "ServerShutdown", Payload: fmt.Sprintf("%q", msg.Reason)})
+		m.messages = append(m.messages, ChatMessage{Role: "system", Content: "[Server restarting, reconnecting...]"})
+		m.streaming = false
+		m.status = "reconnecting..."
+		m.refreshPanels()
+		return m, m.reconnectCmd()
+
+	case ReconnectedMsg:
+		m.addEvent(EventEntry{Dir: Outgoing, Type: "Reconnected"})
+		m.status = "reconnected"
+		m.refreshPanels()
+		return m, WaitForEvent(m.stream)
+
 	case ErrorMsg:
 		m.addEvent(EventEntry{Dir: Incoming, Type: "Error", Payload: msg.Err.Error()})
-		m.err = msg.Err
 		m.streaming = false
+		if strings.Contains(msg.Err.Error(), "Unavailable") || strings.Contains(msg.Err.Error(), "EOF") || strings.Contains(msg.Err.Error(), "transport is closing") {
+			m.messages = append(m.messages, ChatMessage{Role: "system", Content: "[Connection lost, reconnecting...]"})
+			m.status = "reconnecting..."
+			m.refreshPanels()
+			return m, m.reconnectCmd()
+		}
+		m.err = msg.Err
 		m.status = fmt.Sprintf("error: %s", msg.Err)
 		m.refreshPanels()
 		return m, nil
@@ -210,6 +235,18 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m *Model) reconnectCmd() tea.Cmd {
+	return func() tea.Msg {
+		m.stream.Close()
+		newStream, err := grpcclient.OpenStream(m.grpcClient, m.timeout)
+		if err != nil {
+			return ErrorMsg{Err: fmt.Errorf("reconnect failed: %w", err)}
+		}
+		m.stream = newStream
+		return ReconnectedMsg{}
+	}
+}
+
 func (m *Model) addEvent(e EventEntry) {
 	m.eventLog = append(m.eventLog, e)
 }
@@ -271,6 +308,9 @@ func (m Model) renderMessages() string {
 			if m.streaming && i == len(m.messages)-1 {
 				content += "▌"
 			}
+		case "system":
+			prefix = ErrorStyle.Render("")
+			content = ErrorStyle.Render(msg.Content)
 		}
 		b.WriteString(prefix)
 		b.WriteString(wordWrap(content, width-6))

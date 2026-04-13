@@ -51,7 +51,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	model := tui.NewModel(stream, "conversation-1")
+	model := tui.NewModel(client, stream, "conversation-1", *timeout)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

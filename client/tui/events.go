@@ -30,6 +30,8 @@ var (
 	IncomingHeartbeatStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Faint(true)
 	IncomingAckStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
 	IncomingUsageStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
+	IncomingShutdownStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
+	OutgoingReconnectStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true)
 	ArrowOutStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true)
 	ArrowInStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
 )
@@ -62,6 +64,8 @@ func (e EventEntry) styleForType() lipgloss.Style {
 			return OutgoingCancelStyle
 		case "ContextInjection":
 			return OutgoingContextStyle
+		case "Reconnected":
+			return OutgoingReconnectStyle
 		}
 		return OutgoingUserMsgStyle
 	}
@@ -79,6 +83,8 @@ func (e EventEntry) styleForType() lipgloss.Style {
 		return IncomingAckStyle
 	case "UsageInfo":
 		return IncomingUsageStyle
+	case "ServerShutdown":
+		return IncomingShutdownStyle
 	}
 	return IncomingTokenStyle
 }
