@@ -54,6 +54,8 @@ data:
         - name: chat_service
           type: STRICT_DNS
           lb_policy: ROUND_ROBIN
+          connect_timeout: 5s
+          dns_lookup_family: V4_ONLY
           typed_extension_protocol_options:
             envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
               "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
