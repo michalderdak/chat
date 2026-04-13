@@ -15,6 +15,36 @@ import (
 	"github.com/michal-derdak/chat/client/grpcclient"
 )
 
+// ChatMessage holds a single chat bubble.
+type ChatMessage struct {
+	Role    string
+	Content string
+}
+
+// wordWrap inserts newlines at word boundaries so no line exceeds width.
+func wordWrap(s string, width int) string {
+	if width <= 0 {
+		return s
+	}
+	var b strings.Builder
+	col := 0
+	for _, r := range s {
+		if r == '\n' {
+			b.WriteRune(r)
+			col = 0
+			continue
+		}
+		if col >= width && r == ' ' {
+			b.WriteRune('\n')
+			col = 0
+			continue
+		}
+		b.WriteRune(r)
+		col++
+	}
+	return b.String()
+}
+
 // ModeMsg wraps a tea.Msg with the mode index it belongs to
 type ModeMsg struct {
 	ModeIndex int
