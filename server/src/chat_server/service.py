@@ -66,7 +66,7 @@ class ChatServiceServicer(chat_pb2_grpc.ChatServiceServicer):
             async for token in self._ollama.chat(request.text):
                 full_response += token
             hostname = os.environ.get("HOSTNAME", "unknown")
-            await context.set_trailing_metadata([("x-served-by", hostname)])
+            context.set_trailing_metadata([("x-served-by", hostname)])
             return chat_pb2.SendMessageResponse(
                 conversation_id=request.conversation_id,
                 text=full_response,
