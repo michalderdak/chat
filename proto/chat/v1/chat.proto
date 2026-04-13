@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "github.com/michal-derdak/chat/gen/go/chat/v1;chatv1";
+
+import "google/api/annotations.proto";
+
+service ChatService {
+  // Unary RPC — used for gRPC-Gateway HTTP/JSON transcoding demo
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse) {
+    option (google.api.http) = {
+      post: "/v1/chat/send"
+      body: "*"
+    };
+  }
+
+  // Bidirectional streaming RPC — core of the demo
+  rpc Chat(stream ChatRequest) returns (stream ChatResponse);
+}
+
+// --- Unary messages ---
+
+message SendMessageRequest {
+  string conversation_id = 1;
+  string text = 2;
+}
+
+message SendMessageResponse {
+  string conversation_id = 1;
+  string text = 2;
+}
+
+// --- Bidi streaming messages ---
+
+message ChatRequest {
+  string conversation_id = 1;
+  oneof action {
+    UserMessage user_message = 2;
+    CancelGeneration cancel = 3;
+    ContextInjection add_context = 4;
+  }
+}
+
+message UserMessage {
+  string text = 1;
+}
+
+message CancelGeneration {}
+
+message ContextInjection {
+  string text = 1;
+}
+
+message ChatResponse {
+  string conversation_id = 1;
+  oneof event {
+    Token token = 2;
+    StatusUpdate status = 3;
+    Error error = 4;
+    Heartbeat heartbeat = 5;
+    Acknowledgement ack = 6;
+    UsageInfo usage = 7;
+    ServerShutdown shutdown = 8;
+  }
+}
+
+message Token {
+  string text = 1;
+}
+
+enum Phase {
+  PHASE_UNSPECIFIED = 0;
+  PHASE_THINKING = 1;
+  PHASE_GENERATING = 2;
+  PHASE_DONE = 3;
+}
+
+message StatusUpdate {
+  Phase phase = 1;
+}
+
+message Error {
+  int32 code = 1;
+  string message = 2;
+}
+
+message Heartbeat {
+  string beat = 1;
+}
+
+message Acknowledgement {
+  string acknowledged_type = 1;
+}
+
+message UsageInfo {
+  int32 prompt_tokens = 1;
+  int32 completion_tokens = 2;
+  int32 context_length = 3;
+}
+
+message ServerShutdown {
+  string reason = 1;
+}
+
+// --- Storage messages (Redis serialization) ---
+
+message ConversationMessage {
+  string role = 1;
+  string content = 2;
+}
+
+message ConversationHistory {
+  repeated ConversationMessage messages = 1;
+}

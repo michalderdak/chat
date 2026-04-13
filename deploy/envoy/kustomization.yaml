@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: chat-envoy
+resources:
+  - namespace.yaml
+  - ../base
+  - envoy-configmap.yaml
+  - envoy-deployment.yaml
+  - envoy-service.yaml
+patches:
+  - path: server-patch.yaml
+    target:
+      kind: Deployment
+      name: chat-server
+  - path: server-service-headless.yaml
+    target:
+      kind: Service
+      name: chat-server
