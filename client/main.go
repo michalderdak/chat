@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -15,14 +13,13 @@ import (
 )
 
 func main() {
-	target := flag.String("target", "localhost:50051", "gRPC server address")
+	grpcTarget := flag.String("grpc-target", "localhost:50051", "gRPC server address (plaintext)")
+	envoyTarget := flag.String("envoy-target", "localhost:50052", "Envoy proxy address (mTLS)")
 	token := flag.String("token", "demo-token", "Bearer token for auth")
-	useTLS := flag.Bool("tls", false, "Use TLS")
-	caCert := flag.String("ca-cert", "", "Path to CA certificate (for TLS)")
-	clientCert := flag.String("client-cert", "", "Path to client certificate (for mTLS)")
-	clientKey := flag.String("client-key", "", "Path to client key (for mTLS)")
+	caCert := flag.String("ca-cert", "", "Path to CA certificate (for Envoy mTLS)")
+	clientCert := flag.String("client-cert", "", "Path to client certificate (for Envoy mTLS)")
+	clientKey := flag.String("client-key", "", "Path to client key (for Envoy mTLS)")
 	timeout := flag.Duration("timeout", 30*time.Minute, "Stream timeout")
-	unary := flag.Bool("unary", false, "Use unary RPCs instead of bidi streaming")
 	flag.Parse()
 
 	logFile, err := os.OpenFile("client.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
@@ -33,39 +30,33 @@ func main() {
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
-	client, conn, err := grpcclient.NewChatClient(grpcclient.Config{
-		Target:     *target,
+	// Connection 1: plaintext gRPC
+	grpcClient, grpcConn, grpcErr := grpcclient.NewChatClient(grpcclient.Config{
+		Target:  *grpcTarget,
+		Token:   *token,
+		UseTLS:  false,
+		Timeout: *timeout,
+	})
+	if grpcConn != nil {
+		defer grpcConn.Close()
+	}
+
+	// Connection 2: mTLS Envoy
+	envoyClient, envoyConn, envoyErr := grpcclient.NewChatClient(grpcclient.Config{
+		Target:     *envoyTarget,
 		Token:      *token,
-		UseTLS:     *useTLS,
+		UseTLS:     true,
 		CACert:     *caCert,
 		ClientCert: *clientCert,
 		ClientKey:  *clientKey,
 		Timeout:    *timeout,
 	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to connect: %v\n", err)
-		os.Exit(1)
-	}
-	defer conn.Close()
-
-	idBytes := make([]byte, 8)
-	rand.Read(idBytes)
-	conversationID := "chat-" + hex.EncodeToString(idBytes)
-
-	var p *tea.Program
-	if *unary {
-		model := tui.NewUnaryModel(client, conversationID)
-		p = tea.NewProgram(model, tea.WithAltScreen())
-	} else {
-		stream, err := grpcclient.OpenStream(client, *timeout)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to open stream: %v\n", err)
-			os.Exit(1)
-		}
-		model := tui.NewModel(client, stream, conversationID, *timeout)
-		p = tea.NewProgram(model, tea.WithAltScreen())
+	if envoyConn != nil {
+		defer envoyConn.Close()
 	}
 
+	model := tui.NewUnifiedModel(grpcClient, grpcErr, envoyClient, envoyErr, *timeout)
+	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
