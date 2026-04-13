@@ -1,6 +1,6 @@
 ---
 theme: dark
-author: gRPC Consultant Session
+author: gRPC Session
 date: MMMM dd, YYYY
 paging: Slide %d / %d
 ---
@@ -37,6 +37,7 @@ Deployed on Kubernetes with Envoy proxy
 - Native streaming support -- not bolted on like WebSockets over HTTP/1.1
 - First-class deadlines, cancellation, and metadata propagation
 - Standardized ecosystem: health checking, reflection, load balancing, interceptors
+- **grpc-ecosystem** (github.com/grpc-ecosystem): community tools -- grpc-gateway, grpc-health-probe, Go middleware
 
 ---
 
@@ -338,6 +339,7 @@ rpc SendMessage(SendMessageRequest) returns (SendMessageResponse) {
 - One annotation in the proto = full REST endpoint
 - **Limitation**: unary and server-streaming only -- NO bidi streaming
 - OpenAPI spec generated automatically from the same proto
+- Part of **grpc-ecosystem** (github.com/grpc-ecosystem/grpc-gateway)
 
 ---
 
