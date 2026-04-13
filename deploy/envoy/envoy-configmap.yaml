@@ -68,7 +68,7 @@ data:
               - lb_endpoints:
                   - endpoint:
                       address:
-                        socket_address: { address: chat-server, port_value: 50051 }
+                        socket_address: { address: chat-server-headless, port_value: 50051 }
           health_checks:
             - timeout: 5s
               interval: 10s
