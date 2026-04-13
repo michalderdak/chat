@@ -17,11 +17,11 @@ Deployed on Kubernetes with Envoy proxy
 
 # About Me
 
-Working at **Visma** on two gRPC services running in production on GKE with Istio:
+Working at **Visma** for 5 years, leading teams of 6 data engineers, 2 frontend developers and 4 data admins. 
 
 **Smartscan** -- Document scanning & extraction API
 - ~20 million document scans per month
-- gRPC service inside Istio service mesh
+- State of the art LLM-based extraction models
 
 **Autosuggest** -- Generic classifier for transactional data
 - ~26 million prediction calls per month
@@ -29,8 +29,8 @@ Working at **Visma** on two gRPC services running in production on GKE with Isti
 
 Both services:
 - Hosted on **GKE** inside **Istio** service mesh
-- gRPC with connections to BigQuery, Cloud Storage, and Spanner
-- Production experience that informs everything in this talk
+- gRPC APIs in Go and Python
+- BigQuery, Cloud Storage, and Spanner
 
 ---
 
@@ -103,24 +103,30 @@ TCP Connection
 
 # Protobuf as Contract
 
-Our chat service proto: `proto/chat/v1/chat.proto`
-
 ```protobuf
-message ChatRequest {
-  string conversation_id = 1;  // Field numbers are permanent
-  oneof action {
-    UserMessage user_message = 2;
-    CancelGeneration cancel = 3;
-    ContextInjection add_context = 4;
-  }
+syntax = "proto3";
+package chat.v1;
+
+message SendMessageRequest {
+  string conversation_id = 1;  // Field 1 -- permanent wire identity
+  string text = 2;             // Field 2 -- name can change, number cannot
 }
+```
+
+**JSON**: `{"conversation_id":"abc","text":"hello"}` -- 44 bytes, field names every time
+
+**Protobuf**: `[0x0A 03 "abc"][0x12 05 "hello"]` -- 14 bytes, tag + value only
+
+```
+Tag = (field_number << 3) | wire_type
+Field 1: (1 << 3) | 2 = 0x0A   -- "conversation_id" becomes 1 byte
+Field 2: (2 << 3) | 2 = 0x12   -- "text" becomes 1 byte
 ```
 
 - Field numbers are the wire identity -- names can change, numbers cannot
 - **Safe changes**: add fields, add enum values, deprecate fields
 - **Breaking changes**: reuse numbers, change types, remove fields
-- `oneof` enforces exactly-one -- ideal for multiplexing message types on a stream
-- Compact wire format: no field names transmitted, just tag + value
+- Both sides need the `.proto` schema to decode -- trade-off: readability vs compact + fast
 
 ---
 
