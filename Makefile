@@ -125,6 +125,7 @@ grpcurl-send:
 curl-send:
 	curl -X POST http://localhost:8080/v1/chat/send \
 		-H 'Content-Type: application/json' \
+		-H 'Authorization: Bearer demo-token' \
 		-d '{"conversation_id":"test","text":"Hello"}'
 
 # --- Logs ---

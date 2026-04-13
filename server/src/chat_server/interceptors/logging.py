@@ -41,7 +41,10 @@ class LoggingInterceptor(grpc.aio.ServerInterceptor):
                 msg_num = 0
                 async for msg in request_iterator:
                     msg_num += 1
-                    action = msg.WhichOneof("action") if hasattr(msg, "WhichOneof") else "unknown"
+                    try:
+                        action = msg.WhichOneof("action")
+                    except (ValueError, AttributeError):
+                        action = "unknown"
                     log.info("stream.recv", method=method, msg_num=msg_num, action=action)
                     yield msg
 
@@ -50,7 +53,10 @@ class LoggingInterceptor(grpc.aio.ServerInterceptor):
                 try:
                     async for response in original(_log_request_iterator(request_iterator), context):
                         msg_count += 1
-                        event_type = response.WhichOneof("event") if hasattr(response, "WhichOneof") else "unknown"
+                        try:
+                            event_type = response.WhichOneof("event")
+                        except (ValueError, AttributeError):
+                            event_type = "unknown"
                         log.info("stream.send", method=method, msg_num=msg_count, event_type=event_type)
                         yield response
                     duration = round((time.monotonic() - start) * 1000, 2)

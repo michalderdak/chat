@@ -19,7 +19,14 @@ func main() {
 	flag.Parse()
 
 	ctx := context.Background()
-	mux := runtime.NewServeMux()
+	mux := runtime.NewServeMux(
+		runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
+			if key == "Authorization" {
+				return key, true
+			}
+			return runtime.DefaultHeaderMatcher(key)
+		}),
+	)
 
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
