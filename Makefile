@@ -102,7 +102,8 @@ grpcurl-health:
 	grpcurl -plaintext localhost:50051 grpc.health.v1.Health/Check
 
 grpcurl-send:
-	grpcurl -plaintext -d '{"conversation_id":"test","text":"Hello"}' \
+	grpcurl -plaintext -H 'authorization: Bearer demo-token' \
+		-d '{"conversation_id":"test","text":"Hello"}' \
 		localhost:50051 chat.v1.ChatService/SendMessage
 
 curl-send:
