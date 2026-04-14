@@ -50,7 +50,7 @@ data:
                                 cluster: chat_service
                                 timeout: 0s
                                 max_stream_duration:
-                                  max_stream_duration: 1800s
+                                  max_stream_duration: 30s
                     http_filters:
                       - name: envoy.filters.http.router
                         typed_config:
