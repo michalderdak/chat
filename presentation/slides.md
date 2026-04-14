@@ -706,6 +706,10 @@ The 30s budget: 5s preStop + 20s drain + 5s server.stop = safe margin.
 
 **When to use Envoy**: multi-replica, mTLS required, need centralized timeout/LB/observability
 
+**Stream lifecycle difference:**
+- Direct gRPC: `max_connection_age` kills the entire connection -- all streams on it die
+- Envoy: `max_stream_duration` kills individual streams -- connection stays alive
+
 **In our demo**: same pods serve both -- Tab between gRPC and Envoy tabs to see the difference
 
 ---
