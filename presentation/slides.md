@@ -696,7 +696,7 @@ The 30s budget: 5s preStop + 20s drain + 5s server.stop = safe margin.
 | **TLS** | App manages certs | Envoy terminates mTLS, backend stays plaintext |
 | **Load balancing** | Client-side pick_first | Per-RPC round-robin via headless service |
 | **Timeouts** | Client sets deadline | Envoy enforces per-route timeouts (even if client forgets) |
-| **Stream lifecycle** | No external control | `max_stream_duration` forces reconnect |
+| **Stream lifecycle** | `max_connection_age` (connection-level) | `max_stream_duration` (per-stream) |
 | **Health checking** | K8s probes only | Envoy gRPC health checks, removes unhealthy pods |
 | **Observability** | App interceptors only | Envoy stats + app interceptors |
 | **Latency overhead** | None | ~0.1-0.5ms per hop |
