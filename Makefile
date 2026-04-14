@@ -4,11 +4,7 @@
         grpcurl-list grpcurl-health grpcurl-send curl-send \
         logs logs-envoy-proxy
 
-# Third-party proto includes (googleapis for google.api.http annotations)
-# Used by grpc_tools.protoc which cannot resolve buf deps
-THIRD_PARTY_DIR ?= /third_party
-
-# --- Code Generation (Docker-based) ---
+# --- Code Generation ---
 
 # Generate all stubs via buf remote plugins (no local tools needed except buf)
 generate:
