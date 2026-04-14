@@ -36,16 +36,16 @@ Both services:
 
 # Agenda
 
-1. gRPC Fundamentals -- what, why, and how it works under the hood
-2. Protobuf & Buf -- schema-first design with tooling
-3. Bidirectional Streaming -- real-time human-in-the-loop patterns
-4. Interceptors -- auth, logging, metrics, traces without touching handlers
-5. Context Management -- deadlines, cancellation, propagation
-6. gRPC Gateway -- REST/JSON transcoding from the same proto
-7. Envoy Proxy -- mTLS, per-RPC load balancing, stream management
-8. Graceful Shutdown -- draining streams, Redis history, client reconnect
-9. Observability -- Prometheus, OpenTelemetry, Jaeger
-10. Live Demos throughout
+1. gRPC Fundamentals -- HTTP/2, Protobuf, the four RPC types
+2. Protobuf & Buf -- schema-first design, wire format, tooling
+3. **Demo: Pure gRPC Chat** -- bidi streaming, cancel, context injection
+4. Context Management -- deadlines, cancellation, metadata propagation
+5. Health Checking, Reflection, Interceptors
+6. gRPC Gateway -- REST/JSON transcoding, error model
+7. Load Balancing -- client-side vs proxy-level
+8. **Demo: Envoy gRPC Chat** -- mTLS, round-robin, per-route timeouts
+9. Graceful Shutdown -- drain, Redis history, auto-reconnect
+10. Pure gRPC vs Envoy -- side-by-side comparison
 
 ---
 
@@ -390,11 +390,12 @@ INTERNAL (13)          -- server bug
 - Our interceptors translate Ollama errors to gRPC status codes
 - For streaming: errors mid-stream need application-level recovery
 
-Our client auto-reconnects on `UNAVAILABLE` and `ServerShutdown`:
+Our client auto-reconnects on `UNAVAILABLE`, `RST_STREAM`, and `ServerShutdown`:
 
 ```go
-if strings.Contains(err, "Unavailable") {
-    return m, m.reconnectCmd()
+if strings.Contains(err, "Unavailable") || strings.Contains(err, "RST_STREAM") {
+    mode.Reconnecting = true
+    return m, withMode(idx, m.reconnectCmd(idx))
 }
 ```
 
@@ -407,7 +408,7 @@ Client-side    Client ──────────────> Servers  (clie
 ```
 
 **Client-side** (built into gRPC):
-- `pick_first` (default): one backend, failover on error -- our gRPC namespace
+- `pick_first` (default): one backend, failover on error -- our direct gRPC path
 - `round_robin`: rotate across all resolved IPs -- needs headless service
 - No extra hop, lowest latency, but every client needs service discovery
 
@@ -424,8 +425,8 @@ Everything from pure gRPC, plus:
 - **mTLS**: client cert + CA verification -- zero code in the Python server, Envoy terminates TLS
 - **Per-RPC round-robin**: unary requests hit different pods -- visible in event log pod names
 - **Headless service discovery**: Envoy resolves all pod IPs via DNS, not one virtual IP
-- **Per-route timeouts**: unary gets 30s, bidi streaming gets 30 minutes -- configured in Envoy, not app code
-- **HTTP/2 keepalive**: Envoy pings backends every 10s to detect dead connections
+- **Per-route timeouts**: configured in Envoy, not app code
+- **HTTP/2 keepalive**: Envoy pings backends to detect dead connections
 - **gRPC health checking**: Envoy probes each pod with the standard health protocol, removes unhealthy ones
 - **Preconnect**: Envoy eagerly opens connections to all backends before the first request arrives
 - **Observability for free**: Envoy stats (upstream_rq_total, latency histograms) without app changes
@@ -444,18 +445,18 @@ Go Client ──────────> Envoy Proxy ────────�
   +-- CA cert + client cert required
 ```
 
-Our setup: `deploy/envoy/envoy-configmap.yaml`
+Our setup: `deploy/chat/envoy-configmap.yaml`
 
 - Envoy speaks HTTP/2 natively -- no protocol downgrade
 - **Per-RPC load balancing**: each unary RPC can hit a different pod
-- **mTLS**: client cert required, CA-signed, auto-generated
+- **mTLS**: client cert required, CA-signed
 - A bidi stream stays on ONE pod for its lifetime (the stream IS the session)
 
 ---
 
 # Envoy Config Walkthrough
 
-`deploy/envoy/envoy-configmap.yaml`
+`deploy/chat/envoy-configmap.yaml`
 
 ```yaml
 routes:
@@ -467,7 +468,7 @@ routes:
     route:
       cluster: chat_service
       timeout: 0s
-      max_stream_duration: { max_stream_duration: 1800s }
+      max_stream_duration: { max_stream_duration: 30s }
 
 clusters:
   - type: STRICT_DNS
@@ -476,81 +477,28 @@ clusters:
     preconnect_policy: { per_upstream_preconnect_ratio: 3.0 }
 ```
 
-Per-route timeouts: unary gets 30s, streaming gets 30 minutes.
+Per-route timeouts: unary gets 30s timeout, streaming gets 30s max stream duration.
 
 ---
 
 # Headless Service for Envoy Discovery
 
 ```yaml
-# deploy/envoy/server-service-headless.yaml
-# Patches base service to clusterIP: None in envoy namespace
+# deploy/chat/server-headless-service.yaml
+# Separate headless service for Envoy pod discovery
 apiVersion: v1
 kind: Service
 metadata:
-  name: chat-server
+  name: chat-server-headless
 spec:
   clusterIP: None   # Returns all pod IPs, not one virtual IP
+  selector:
+    app: chat-server
 ```
 
-**Regular ClusterIP**: DNS returns 1 virtual IP -> Envoy "round-robins" across 1 address
-**Headless (clusterIP: None)**: DNS returns all pod IPs -> real round-robin
-
-The `chat-grpc` namespace keeps regular ClusterIP -- demonstrating pick-first behavior.
-
----
-
-# Demo: Unary Load Balancing -- Envoy vs Direct
-
-In the unified TUI (`make client`), switch tabs to compare:
-
-**Tab: Envoy Unary** -- round-robin, different pod each request:
-```
-→ SendMessage "Hey"
-← Response (chat-server-5md2x) 1.2s
-→ SendMessage "Hello"
-← Response (chat-server-9zstr) 0.9s   <-- different pod!
-→ SendMessage "Hi"
-← Response (chat-server-hp78l) 1.1s   <-- different pod!
-```
-
-**Tab: gRPC Unary** -- pick-first, same pod every time:
-```
-→ SendMessage "Hey"
-← Response (chat-server-dbk28) 1.0s
-→ SendMessage "Hello"
-← Response (chat-server-dbk28) 0.8s   <-- same pod
-```
-
-Pod name returned via gRPC trailing metadata (`x-served-by`).
-Same connection, same TUI -- just switch tabs to see the difference.
-
----
-
-# mTLS with Envoy
-
-Certs generated by: `deploy/envoy/certs/generate-certs.sh`
-
-```bash
-# Self-signed CA
-openssl genrsa -out ca.key 4096
-openssl req -new -x509 -sha256 -key ca.key -out ca.crt
-
-# Server cert with SANs for K8s service names
-openssl x509 -req -extfile <(printf "subjectAltName=
-  DNS:chat-server,
-  DNS:chat-server.chat-envoy.svc.cluster.local,
-  DNS:envoy,DNS:localhost")
-
-# Client cert signed by same CA
-openssl x509 -req -CA ca.crt -CAkey ca.key -out client.crt
-```
-
-```bash
-# Unified client passes both connection configs:
-make client  # --grpc-target + --envoy-target with certs
-# Switch to Envoy tabs to use mTLS connection
-```
+Same namespace, two services pointing at the same pods:
+- `chat-server` (ClusterIP) → direct gRPC access, pick-first
+- `chat-server-headless` (headless) → Envoy resolves all pod IPs, round-robin
 
 ---
 
@@ -670,7 +618,7 @@ make client  # Tab to "gRPC Stream", send a few messages
 
 Terminal 2:
 ```bash
-kubectl -n chat-grpc rollout restart deployment/chat-server
+kubectl -n chat rollout restart deployment/chat-server
 ```
 
 Watch the gRPC Stream tab:
@@ -724,28 +672,6 @@ The 30s budget: 5s preStop + 20s drain + 5s server.stop = safe margin.
 
 ---
 
-# Observability Stack
-
-```
-Go Client --> gRPC Server --> Ollama
-    |              |
-    |     OTEL traces (W3C propagation)
-    |              |
-    v              v
-OTEL Collector --> Jaeger (traces)     localhost:16686
-                   Prometheus (metrics) localhost:9090
-```
-
-**Prometheus interceptor** (`server/src/chat_server/interceptors/prometheus.py`):
-- `grpc_server_handled_total{method, status}` -- RPC counts
-- `grpc_server_handling_seconds{method}` -- latency histograms
-- `grpc_server_active_streams` -- gauge of open bidi streams
-
-**OTEL interceptor**: spans per-RPC, trace context via gRPC metadata
-**Envoy stats**: upstream connections, retries, latency -- zero app code
-
----
-
 # Benefits and Caveats
 
 **Where gRPC shines:**
@@ -757,54 +683,34 @@ OTEL Collector --> Jaeger (traces)     localhost:16686
 **Where gRPC adds friction:**
 - Browser support requires grpc-web proxy or Connect protocol
 - Binary wire format means no casual `curl` inspection
-- Streaming RPCs need careful timeout, keepalive, and proxy tuning
+- Streaming RPCs need careful timeout, keepalive, or proxy tuning
 - Proto schema evolution requires discipline + CI tooling (`buf breaking`)
-- Need HTTP/2-aware proxies (Envoy) -- nginx falls short for per-RPC LB
+- If you need proxy it needs to be HTTP/2-aware
 
 ---
 
-# Architecture Summary
+# Pure gRPC vs gRPC Behind Envoy
 
-```
-                    Kind Cluster
-+-------------------+-------------------+
-| chat-grpc         | chat-envoy        |
-|                   |                   |
-| Gateway (HTTP)    | Envoy (mTLS)      |
-|   |               |   |              |
-| Server x3         | Server x3         |
-| (bearer token)    | (no auth, Envoy   |
-|                   |  handles mTLS)    |
-| Redis             | Redis             |
-+-------------------+-------------------+
-|         observability                 |
-|  Prometheus | Jaeger | OTEL Collector |
-+---------------------------------------+
-                  |
-            host.docker.internal
-                  |
-              Ollama (Qwen3 0.6B, Metal-accelerated)
-```
+| | Direct gRPC | Via Envoy |
+|---|---|---|
+| **TLS** | App manages certs | Envoy terminates mTLS, backend stays plaintext |
+| **Load balancing** | Client-side pick_first | Per-RPC round-robin via headless service |
+| **Timeouts** | Client sets deadline | Envoy enforces per-route timeouts (even if client forgets) |
+| **Stream lifecycle** | No external control | `max_stream_duration` forces reconnect |
+| **Health checking** | K8s probes only | Envoy gRPC health checks, removes unhealthy pods |
+| **Observability** | App interceptors only | Envoy stats + app interceptors |
+| **Latency overhead** | None | ~0.1-0.5ms per hop |
+| **Complexity** | Simple | Envoy config, certs, headless service |
+
+**When to use direct gRPC**: internal services, low latency, simple deployments
+
+**When to use Envoy**: multi-replica, mTLS required, need centralized timeout/LB/observability
+
+**In our demo**: same pods serve both -- Tab between gRPC and Envoy tabs to see the difference
 
 ---
 
-# Key Makefile Commands
-
-```bash
-make cluster         # Create Kind cluster
-make deploy-all      # Deploy everything (builds, loads, restarts)
-
-make client          # Unified TUI: 4 tabs, 2 connections
-                     # Tab: gRPC Unary | gRPC Stream
-                     #       Envoy Unary | Envoy Stream
-
-make grpcurl-list    # Service discovery via reflection
-make grpcurl-health  # Health check
-make curl-send       # HTTP/JSON via gateway
-
-make logs-grpc       # Server logs (chat-grpc)
-make logs-envoy      # Server logs (chat-envoy)
-```
+# War Stories
 
 ---
 
@@ -824,8 +730,5 @@ make logs-envoy      # Server logs (chat-envoy)
 
 # Thank You
 
-# war stories
-
-PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 
