@@ -7,10 +7,10 @@ A gRPC demo application with a Go terminal client, Python async server, and Qwen
 ```
 Go TUI Client (Bubble Tea)
   |
-  +-- gRPC (plaintext) --> chat-grpc namespace (3 replicas, bearer token auth)
-  +-- gRPC (mTLS)      --> chat-envoy namespace (3 replicas, Envoy proxy)
+  +-- gRPC (plaintext) --> chat namespace (3 replicas, bearer token auth)
+  +-- gRPC (mTLS)      --> Envoy proxy (round-robin LB, mTLS, stream management)
                               |
-                              +-- Round-robin LB, mTLS, stream management
+                              +-- headless service discovery --> chat-server pods
                               |
 Python gRPC Server (grpc.aio)
   |
@@ -34,7 +34,7 @@ Python gRPC Server (grpc.aio)
 
 - Docker Desktop
 - Kind
-- Go 1.23+
+- Go 1.24+
 - Ollama with `qwen3:0.6b` (`ollama pull qwen3:0.6b`)
 - `buf` (`brew install bufbuild/buf/buf`)
 
@@ -55,20 +55,28 @@ make client
 ## Make Targets
 
 ```
+make generate        # Generate proto stubs via buf (remote plugins)
 make docker          # Generate proto stubs via Docker
 make lint            # buf lint
 make breaking        # buf breaking change detection
+make clean           # Remove generated files
 
 make cluster         # Create Kind cluster
-make deploy-all      # Build, load, deploy everything
+make build           # Build server and gateway Docker images
+make load            # Build and load images into Kind
+make certs           # Generate TLS certificates for mTLS
+make deploy-chat     # Build, load, deploy chat services + Envoy
+make deploy-observability  # Deploy Prometheus, Jaeger, OTEL Collector
+make deploy-all      # Deploy everything (observability + chat)
 make client          # Unified TUI (Tab to switch modes)
 
 make grpcurl-list    # Service discovery via reflection
 make grpcurl-health  # Health check
+make grpcurl-send    # Unary RPC via grpcurl
 make curl-send       # HTTP/JSON via gateway
 
-make logs-grpc       # Server logs (chat-grpc namespace)
-make logs-envoy      # Server logs (chat-envoy namespace)
+make logs            # Server logs (chat namespace)
+make logs-envoy-proxy  # Envoy proxy logs
 make cluster-clean   # Delete Kind cluster
 ```
 
@@ -80,7 +88,6 @@ client/                     — Go Bubble Tea TUI with unified 4-tab model
 server/                     — Python async gRPC server with interceptors
 gateway/                    — gRPC-Gateway HTTP/JSON reverse proxy
 deploy/base/                — K8s base manifests (server, gateway, Redis, PDB)
-deploy/grpc/                — chat-grpc namespace (bearer token auth)
-deploy/envoy/               — chat-envoy namespace (Envoy mTLS + headless LB)
+deploy/chat/                — chat namespace (server, gateway, Envoy mTLS + headless LB, certs)
 deploy/observability/       — Prometheus, Jaeger, OTEL Collector
 ```

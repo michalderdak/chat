@@ -712,9 +712,8 @@ The 30s budget: 5s preStop + 20s drain + 5s server.stop = safe margin.
 **Key takeaways**:
 - Protobuf-first design gives you type safety, codegen, and docs for free
 - Bidi streaming unlocks patterns impossible with REST
-- Interceptors keep handlers clean -- auth, metrics, tracing are config
+- Interceptors keep handlers clean -- auth, metrics, tracing, logs
 - Envoy is the natural proxy for gRPC -- HTTP/2 native, per-RPC LB, mTLS
-- Graceful shutdown with Redis history = zero-downtime rolling updates
 - Always set deadlines, always tune keepalives, always plan for stream lifecycle
 
 ---
