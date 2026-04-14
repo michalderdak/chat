@@ -94,7 +94,7 @@ TCP Connection
 ```
 
 - **Binary framing**: length-prefixed frames, no chunked-encoding hacks
-- **Multiplexing**: multiple RPCs share one TCP connection, no head-of-line blocking
+- **Multiplexing**: multiple RPCs share one TCP connection
 - **Flow control**: per-stream back-pressure prevents fast producers overwhelming slow consumers
 - **Header compression (HPACK)**: repeated metadata compressed across frames
 - Why this matters: 100 concurrent users = 100 streams on ONE connection
@@ -214,7 +214,7 @@ Client (Go TUI)              Server (Python async)
 - **Cancel mid-stream**: client sends cancel, server sets event flag, generation stops
 - **Mid-generation interrupt**: type a new message while AI is streaming -- auto-cancels + sends new
 - **Context injection**: send a control message with extra context (e.g. "remember this fact") that the server can use in generation
-- **One TCP connection, multiple streams**: chat stream + unary RPCs
+- **Multiplexing in action - one TCP connection, multiple streams**: chat stream + unary RPCs
 - **Connected to a single server pod** -- no load balancing
 
 ---
@@ -325,57 +325,7 @@ Each interceptor wraps the handler via `intercept_service`:
 
 ---
 
-# gRPC Load Balancing: Three Approaches
-
-```
-1. Client-side    Client ──────────────> Servers  (client decides)
-
-2. Proxy-level    Client ──> Envoy ──> Servers    (proxy decides)
-
-3. xDS / Proxyless  Client ──────────> Servers    (client decides,
-                       ↑                           control plane advises)
-                       └── xDS control plane (e.g. Istio)
-```
-
-**Client-side** (built into gRPC):
-- `pick_first` (default): one backend, failover on error -- our gRPC namespace
-- `round_robin`: rotate across all resolved IPs -- needs headless service
-- No extra hop, lowest latency, but every client needs service discovery
-
-**Proxy-level** (Envoy):
-- Per-RPC balancing, mTLS, retries, observability -- our Envoy namespace
-- Extra hop, but centralizes complexity
-
-**xDS / Proxyless mesh** (Google-scale):
-- Client speaks xDS protocol to control plane (Istio's istiod)
-- Client-side performance + centralized policy. No proxy hop.
-
----
-
-# Demo: Unified TUI -- One Client, Four Modes
-
-```bash
-make client  # Single command, two gRPC connections, four tabs
-```
-
-```
-┌─[gRPC Unary]─[gRPC Stream]─[Envoy Unary]─[Envoy Stream]─┐
-│  Chat (gRPC Stream)     │  gRPC Event Log                 │
-│  You: Hey               │  → UserMessage "Hey"            │
-│  AI: Hello! ...         │  ← StatusUpdate GENERATING      │
-├─────────────────────────┴─────────────────────────────────┤
-│ gRPC Stream | pod: chat-server-abc | streaming            │
-└───────────────────────────────────────────────────────────┘
-```
-
-- **Tab** cycles: gRPC Unary → gRPC Stream → Envoy Unary → Envoy Stream
-- Two connections (plaintext + mTLS) share HTTP/2 multiplexing
-- Background streams keep running when tabbed away
-- Each tab has independent chat history and event log
-
----
-
-# gRPC Gateway: REST from the Same Proto
+# gRPC Gateway: HTTP1/JSON
 
 `gateway/main.go` -- auto-generated HTTP/JSON reverse proxy
 
@@ -394,10 +344,11 @@ rpc SendMessage(SendMessageRequest) returns (SendMessageResponse) {
 }
 ```
 
-- One annotation in the proto = full REST endpoint
+- One annotation in the proto could equal full REST endpoint
 - **Limitation**: unary and server-streaming only -- NO bidi streaming
-- OpenAPI spec generated automatically from the same proto
 - Part of **grpc-ecosystem** (github.com/grpc-ecosystem/grpc-gateway)
+
+*`make curl-send`* - sends HTTP/JSON request to gateway, which proxies to gRPC server
 
 ---
 
@@ -412,14 +363,14 @@ grpcurl -plaintext -H 'authorization: Bearer demo-token' \
 # 2. HTTP/JSON via Gateway (curl-friendly)
 curl -X POST http://localhost:8080/v1/chat/send \
   -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer demo-token' \
   -d '{"conversation_id":"1","text":"Hello"}'
 
 # 3. Go TUI (full bidi streaming)
 make client
 ```
 
-Same server, same proto, three access patterns.
-Gateway for quick integration; native gRPC for streaming.
+Same server, same proto, three access patterns
 
 ---
 
@@ -449,26 +400,35 @@ if strings.Contains(err, "Unavailable") {
 
 ---
 
-# HTTP/2 Multiplexing in Action
-
-Our unified client demonstrates HTTP/2 multiplexing:
+# Pure gRPC Load Balancing
 
 ```
-grpcConn (1 TCP connection to localhost:50051)
- +-- Stream: gRPC Unary SendMessage RPCs
- +-- Stream: gRPC Bidi Chat stream (tokens flowing)
- +-- Stream: Health checks
-
-envoyConn (1 TCP connection to localhost:50052)
- +-- Stream: Envoy Unary SendMessage RPCs
- +-- Stream: Envoy Bidi Chat stream (tokens flowing)
+Client-side    Client ──────────────> Servers  (client decides)
 ```
 
-- Two TCP connections total, not four
-- Unary and streaming RPCs coexist on the same connection
-- Tab to "gRPC Stream", start chatting, tab to "gRPC Unary", send a message
-- Both work simultaneously -- multiplexed on one connection
-- This is WHY gRPC uses HTTP/2 -- impossible with HTTP/1.1
+**Client-side** (built into gRPC):
+- `pick_first` (default): one backend, failover on error -- our gRPC namespace
+- `round_robin`: rotate across all resolved IPs -- needs headless service
+- No extra hop, lowest latency, but every client needs service discovery
+
+---
+
+# Any Questions So Far?
+
+---
+
+# Demo: The Chat App - Envoy
+
+Everything from pure gRPC, plus:
+
+- **mTLS**: client cert + CA verification -- zero code in the Python server, Envoy terminates TLS
+- **Per-RPC round-robin**: unary requests hit different pods -- visible in event log pod names
+- **Headless service discovery**: Envoy resolves all pod IPs via DNS, not one virtual IP
+- **Per-route timeouts**: unary gets 30s, bidi streaming gets 30 minutes -- configured in Envoy, not app code
+- **HTTP/2 keepalive**: Envoy pings backends every 10s to detect dead connections
+- **gRPC health checking**: Envoy probes each pod with the standard health protocol, removes unhealthy ones
+- **Preconnect**: Envoy eagerly opens connections to all backends before the first request arrives
+- **Observability for free**: Envoy stats (upstream_rq_total, latency histograms) without app changes
 
 ---
 
