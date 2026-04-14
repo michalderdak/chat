@@ -7,29 +7,11 @@ data:
     global:
       scrape_interval: 15s
     scrape_configs:
-      - job_name: 'chat-server-grpc'
+      - job_name: 'chat-server'
         kubernetes_sd_configs:
           - role: pod
             namespaces:
-              names: ['chat-grpc']
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
-            action: keep
-            regex: true
-          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
-            action: replace
-            regex: (.+);(.+)
-            target_label: __address__
-            replacement: $1:$2
-          - source_labels: [__meta_kubernetes_namespace]
-            target_label: namespace
-          - source_labels: [__meta_kubernetes_pod_name]
-            target_label: pod
-      - job_name: 'chat-server-envoy'
-        kubernetes_sd_configs:
-          - role: pod
-            namespaces:
-              names: ['chat-envoy']
+              names: ['chat']
         relabel_configs:
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
             action: keep
@@ -47,7 +29,7 @@ data:
         kubernetes_sd_configs:
           - role: pod
             namespaces:
-              names: ['chat-envoy']
+              names: ['chat']
         relabel_configs:
           - source_labels: [__meta_kubernetes_pod_label_app]
             action: keep
