@@ -100,9 +100,9 @@ client:
 	go run ./client/ \
 		--grpc-target localhost:50051 --token demo-token \
 		--envoy-target localhost:50052 \
-		--ca-cert deploy/envoy/certs/generated/ca.crt \
-		--client-cert deploy/envoy/certs/generated/client.crt \
-		--client-key deploy/envoy/certs/generated/client.key
+		--ca-cert deploy/chat/certs/generated/ca.crt \
+		--client-cert deploy/chat/certs/generated/client.crt \
+		--client-key deploy/chat/certs/generated/client.key
 
 # --- Demo Helpers ---
 
