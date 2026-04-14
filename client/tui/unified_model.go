@@ -246,7 +246,7 @@ func (m UnifiedModel) handleModeMsg(msg ModeMsg) (tea.Model, tea.Cmd) {
 		mode.EventLog = append(mode.EventLog, EventEntry{Dir: Incoming, Type: "Error", Payload: inner.Err.Error()})
 		mode.Streaming = false
 		mode.Waiting = false
-		if mode.IsStream && (strings.Contains(inner.Err.Error(), "Unavailable") || strings.Contains(inner.Err.Error(), "EOF") || strings.Contains(inner.Err.Error(), "transport is closing")) {
+		if mode.IsStream && (strings.Contains(inner.Err.Error(), "Unavailable") || strings.Contains(inner.Err.Error(), "EOF") || strings.Contains(inner.Err.Error(), "transport is closing") || strings.Contains(inner.Err.Error(), "RST_STREAM")) {
 			mode.Messages = append(mode.Messages, ChatMessage{Role: "system", Content: "[Connection lost, reconnecting...]"})
 			mode.Reconnecting = true
 			m.refreshPanels()
