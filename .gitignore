@@ -221,3 +221,5 @@ gateway/gateway
 
 # OpenAPI generated
 gen/openapiv2/
+*.crt
+*.key

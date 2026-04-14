@@ -22,13 +22,13 @@ service ChatService {
 // --- Unary messages ---
 
 message SendMessageRequest {
-  string conversation_id = 1;
-  string text = 2;
+  string ConveresationID = 1;
+  bool   text            = 2;
 }
 
 message SendMessageResponse {
   string conversation_id = 1;
-  string text = 2;
+  string text            = 2;
 }
 
 // --- Bidi streaming messages ---
@@ -36,9 +36,9 @@ message SendMessageResponse {
 message ChatRequest {
   string conversation_id = 1;
   oneof action {
-    UserMessage user_message = 2;
-    CancelGeneration cancel = 3;
-    ContextInjection add_context = 4;
+    UserMessage      user_message = 2;
+    CancelGeneration cancel       = 3;
+    ContextInjection add_context  = 4;
   }
 }
 
@@ -55,13 +55,13 @@ message ContextInjection {
 message ChatResponse {
   string conversation_id = 1;
   oneof event {
-    Token token = 2;
-    StatusUpdate status = 3;
-    Error error = 4;
-    Heartbeat heartbeat = 5;
-    Acknowledgement ack = 6;
-    UsageInfo usage = 7;
-    ServerShutdown shutdown = 8;
+    Token           token     = 2;
+    StatusUpdate    status    = 3;
+    Error           error     = 4;
+    Heartbeat       heartbeat = 5;
+    Acknowledgement ack       = 6;
+    UsageInfo       usage     = 7;
+    ServerShutdown  shutdown  = 8;
   }
 }
 
@@ -71,9 +71,9 @@ message Token {
 
 enum Phase {
   PHASE_UNSPECIFIED = 0;
-  PHASE_THINKING = 1;
-  PHASE_GENERATING = 2;
-  PHASE_DONE = 3;
+  PHASE_THINKING    = 1;
+  PHASE_GENERATING  = 2;
+  PHASE_DONE        = 3;
 }
 
 message StatusUpdate {
@@ -81,7 +81,7 @@ message StatusUpdate {
 }
 
 message Error {
-  int32 code = 1;
+  int32  code    = 1;
   string message = 2;
 }
 
@@ -94,9 +94,9 @@ message Acknowledgement {
 }
 
 message UsageInfo {
-  int32 prompt_tokens = 1;
+  int32 prompt_tokens     = 1;
   int32 completion_tokens = 2;
-  int32 context_length = 3;
+  int32 context_length    = 3;
 }
 
 message ServerShutdown {
@@ -106,7 +106,7 @@ message ServerShutdown {
 // --- Storage messages (Redis serialization) ---
 
 message ConversationMessage {
-  string role = 1;
+  string role    = 1;
   string content = 2;
 }
 

@@ -15,7 +15,6 @@ plugins:
     opt: paths=source_relative
   - local: protoc-gen-openapiv2
     out: gen/openapiv2
-  # Python (pinned to protobuf 5.x compatible versions)
   - remote: buf.build/protocolbuffers/python:v29.3
     out: gen/python
   - remote: buf.build/protocolbuffers/pyi:v29.3

@@ -160,9 +160,9 @@ plugins:
 
 ![](../buf.yaml)
 
-*`make generate`* - fails, why?
+*`make generate`*
 
-*`make docker`* - succeeds, why?
+*`make docker`*
 
 lint & breaking changes
 
@@ -262,11 +262,10 @@ Client <──[x-served-by: chat-server-5md2x]─── Server
 - **Auth**: `authorization` in metadata, attached by client stream interceptor
 - **Traces**: `traceparent` propagated via OTEL, enables end-to-end tracing
 - **Pod identity**: `x-served-by` in trailing metadata, visible in TUI event log
-- Metadata flows through interceptors without touching handler code
 
 ---
 
-# Health Checking & Reflection
+# Health Checking
 
 `server/src/chat_server/main.py`
 
@@ -299,6 +298,8 @@ reflection.enable_server_reflection(service_names, server)
 - Reflection lets `grpcurl` discover services at runtime
 
 *`make grpcurl-list`* - lists services and methods via reflection
+
+*`make grpcurl-send`* - sends a request without needing the proto file locally
 
 ---
 
@@ -431,9 +432,6 @@ Everything from pure gRPC, plus:
 - **Preconnect**: Envoy eagerly opens connections to all backends before the first request arrives
 - **Observability for free**: Envoy stats (upstream_rq_total, latency histograms) without app changes
 
----
-
-# Envoy as gRPC Proxy
 
 ```
                mTLS                      plaintext HTTP/2
@@ -444,13 +442,6 @@ Go Client ──────────> Envoy Proxy ────────�
   |                      +-- Headless service DNS for pod discovery
   +-- CA cert + client cert required
 ```
-
-Our setup: `deploy/chat/envoy-configmap.yaml`
-
-- Envoy speaks HTTP/2 natively -- no protocol downgrade
-- **Per-RPC load balancing**: each unary RPC can hit a different pod
-- **mTLS**: client cert required, CA-signed
-- A bidi stream stays on ONE pod for its lifetime (the stream IS the session)
 
 ---
 
@@ -502,7 +493,7 @@ Same namespace, two services pointing at the same pods:
 
 ---
 
-# Graceful Shutdown: The Problem
+# Graceful Shutdown
 
 What happens when you `kubectl rollout restart` during an active chat?
 
@@ -672,6 +663,31 @@ The 30s budget: 5s preStop + 20s drain + 5s server.stop = safe margin.
 
 ---
 
+# Pure gRPC vs gRPC Behind Envoy
+
+|                      | Direct gRPC                             | Via Envoy                                                  |
+| -------------------- | --------------------------------------- | ---------------------------------------------------------- |
+| **TLS**              | App manages certs                       | Envoy terminates mTLS, backend stays plaintext             |
+| **Load balancing**   | Client-side pick_first                  | Per-RPC round-robin via headless service                   |
+| **Timeouts**         | Client sets deadline                    | Envoy enforces per-route timeouts (even if client forgets) |
+| **Stream lifecycle** | `max_connection_age` (connection-level) | `max_stream_duration` (per-stream)                         |
+| **Health checking**  | K8s probes only                         | Envoy gRPC health checks, removes unhealthy pods           |
+| **Observability**    | App interceptors only                   | Envoy stats + app interceptors                             |
+| **Latency overhead** | None                                    | ~0.1-0.5ms per hop                                         |
+| **Complexity**       | Simple                                  | Envoy config, certs, headless service                      |
+
+**When to use direct gRPC**: internal services, low latency, simple deployments
+
+**When to use Envoy**: multi-replica, mTLS required, need centralized timeout/LB/observability
+
+**Stream lifecycle difference:**
+- Direct gRPC: `max_connection_age` kills the entire connection -- all streams on it die
+- Envoy: `max_stream_duration` kills individual streams -- connection stays alive
+
+**In our demo**: same pods serve both -- Tab between gRPC and Envoy tabs to see the difference
+
+---
+
 # Benefits and Caveats
 
 **Where gRPC shines:**
@@ -686,35 +702,6 @@ The 30s budget: 5s preStop + 20s drain + 5s server.stop = safe margin.
 - Streaming RPCs need careful timeout, keepalive, or proxy tuning
 - Proto schema evolution requires discipline + CI tooling (`buf breaking`)
 - If you need proxy it needs to be HTTP/2-aware
-
----
-
-# Pure gRPC vs gRPC Behind Envoy
-
-| | Direct gRPC | Via Envoy |
-|---|---|---|
-| **TLS** | App manages certs | Envoy terminates mTLS, backend stays plaintext |
-| **Load balancing** | Client-side pick_first | Per-RPC round-robin via headless service |
-| **Timeouts** | Client sets deadline | Envoy enforces per-route timeouts (even if client forgets) |
-| **Stream lifecycle** | `max_connection_age` (connection-level) | `max_stream_duration` (per-stream) |
-| **Health checking** | K8s probes only | Envoy gRPC health checks, removes unhealthy pods |
-| **Observability** | App interceptors only | Envoy stats + app interceptors |
-| **Latency overhead** | None | ~0.1-0.5ms per hop |
-| **Complexity** | Simple | Envoy config, certs, headless service |
-
-**When to use direct gRPC**: internal services, low latency, simple deployments
-
-**When to use Envoy**: multi-replica, mTLS required, need centralized timeout/LB/observability
-
-**Stream lifecycle difference:**
-- Direct gRPC: `max_connection_age` kills the entire connection -- all streams on it die
-- Envoy: `max_stream_duration` kills individual streams -- connection stays alive
-
-**In our demo**: same pods serve both -- Tab between gRPC and Envoy tabs to see the difference
-
----
-
-# War Stories
 
 ---
 
