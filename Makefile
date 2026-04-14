@@ -1,8 +1,8 @@
-.PHONY: generate docker lint breaking cluster build load deploy-grpc deploy-envoy \
+.PHONY: generate docker lint breaking cluster build load deploy-chat \
         deploy-observability deploy-all client \
         certs clean cluster-clean \
         grpcurl-list grpcurl-health grpcurl-send curl-send \
-        logs-grpc logs-envoy logs-envoy-proxy
+        logs logs-envoy-proxy
 
 # Third-party proto includes (googleapis for google.api.http annotations)
 # Used by grpc_tools.protoc which cannot resolve buf deps
@@ -74,31 +74,25 @@ load: build
 deploy-observability:
 	kubectl apply -k deploy/observability/
 
-deploy-grpc: load
-	kubectl apply -k deploy/grpc/
-	kubectl -n chat-grpc rollout restart deployment/chat-server deployment/chat-gateway
-	@echo "Waiting for rollout..."
-	kubectl -n chat-grpc rollout status deployment/chat-server --timeout=120s
-	kubectl -n chat-grpc rollout status deployment/chat-gateway --timeout=120s
-
-deploy-envoy: load certs
-	kubectl create namespace chat-envoy --dry-run=client -o yaml | kubectl apply -f -
-	kubectl -n chat-envoy create secret generic envoy-certs \
-		--from-file=ca.crt=deploy/envoy/certs/generated/ca.crt \
-		--from-file=server.crt=deploy/envoy/certs/generated/server.crt \
-		--from-file=server.key=deploy/envoy/certs/generated/server.key \
+deploy-chat: load certs
+	kubectl create namespace chat --dry-run=client -o yaml | kubectl apply -f -
+	kubectl -n chat create secret generic envoy-certs \
+		--from-file=ca.crt=deploy/chat/certs/generated/ca.crt \
+		--from-file=server.crt=deploy/chat/certs/generated/server.crt \
+		--from-file=server.key=deploy/chat/certs/generated/server.key \
 		--dry-run=client -o yaml | kubectl apply -f -
-	kubectl apply -k deploy/envoy/
-	kubectl -n chat-envoy rollout restart deployment/chat-server deployment/envoy
+	kubectl apply -k deploy/chat/
+	kubectl -n chat rollout restart deployment/chat-server deployment/chat-gateway deployment/envoy
 	@echo "Waiting for rollout..."
-	kubectl -n chat-envoy rollout status deployment/chat-server --timeout=120s
-	kubectl -n chat-envoy rollout status deployment/envoy --timeout=120s
+	kubectl -n chat rollout status deployment/chat-server --timeout=120s
+	kubectl -n chat rollout status deployment/chat-gateway --timeout=120s
+	kubectl -n chat rollout status deployment/envoy --timeout=120s
 
-deploy-all: deploy-observability deploy-grpc deploy-envoy
+deploy-all: deploy-observability deploy-chat
 	@echo "All deployed."
 
 certs:
-	deploy/envoy/certs/generate-certs.sh
+	deploy/chat/certs/generate-certs.sh
 
 # --- Client ---
 
@@ -130,13 +124,10 @@ curl-send:
 
 # --- Logs ---
 
-logs-grpc:
-	kubectl -n chat-grpc logs -l app=chat-server --all-containers -f
-
-logs-envoy:
-	kubectl -n chat-envoy logs -l app=chat-server --all-containers -f
+logs:
+	kubectl -n chat logs -l app=chat-server --all-containers -f
 
 logs-envoy-proxy:
-	kubectl -n chat-envoy logs -l app=envoy -f
+	kubectl -n chat logs -l app=envoy -f
 
 .DEFAULT_GOAL := docker
