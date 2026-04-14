@@ -10,20 +10,13 @@ THIRD_PARTY_DIR ?= /third_party
 
 # --- Code Generation (Docker-based) ---
 
-# This target runs inside the Docker container
+# Generate all stubs via buf remote plugins (no local tools needed except buf)
 generate:
 	@rm -rf gen
 	@mkdir -p gen/go gen/python gen/openapiv2
 
-	@echo "==> Running buf generate (Go, Python, OpenAPI)..."
+	@echo "==> Running buf generate (Go, Python, gRPC, OpenAPI)..."
 	buf generate
-
-	@echo "==> Generating Python gRPC stubs..."
-	python3 -m grpc_tools.protoc \
-		-I proto \
-		-I $(THIRD_PARTY_DIR) \
-		--grpc_python_out=gen/python \
-		proto/chat/v1/chat.proto
 
 	@echo "==> Creating Python __init__.py files..."
 	touch gen/__init__.py gen/python/__init__.py gen/python/chat/__init__.py gen/python/chat/v1/__init__.py
