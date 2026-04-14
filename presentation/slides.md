@@ -219,49 +219,6 @@ Client (Go TUI)              Server (Python async)
 
 ---
 
-# Demo: Unified TUI -- One Client, Four Modes
-
-```bash
-make client  # Single command, two gRPC connections, four tabs
-```
-
-```
-┌─[gRPC Unary]─[gRPC Stream]─[Envoy Unary]─[Envoy Stream]─┐
-│  Chat (gRPC Stream)     │  gRPC Event Log                 │
-│  You: Hey               │  → UserMessage "Hey"            │
-│  AI: Hello! ...         │  ← StatusUpdate GENERATING      │
-├─────────────────────────┴─────────────────────────────────┤
-│ gRPC Stream | pod: chat-server-abc | streaming            │
-└───────────────────────────────────────────────────────────┘
-```
-
-- **Tab** cycles: gRPC Unary → gRPC Stream → Envoy Unary → Envoy Stream
-- Two connections (plaintext + mTLS) share HTTP/2 multiplexing
-- Background streams keep running when tabbed away
-- Each tab has independent chat history and event log
-
----
-
-# Interceptors
-
-Our interceptor chain: `server/src/chat_server/main.py`
-
-```python
-interceptors = [LoggingInterceptor()]      # Outermost: sees everything
-if settings.auth_enabled:
-    interceptors.append(AuthInterceptor())  # Rejects early
-if settings.otel_enabled:
-    interceptors.append(OTelInterceptor())  # Traces
-interceptors.append(PrometheusInterceptor()) # Metrics
-```
-
-Each interceptor wraps the handler via `intercept_service`:
-- Inspect metadata, request, response
-- Works for both unary AND streaming RPCs
-- Add/remove via config -- zero handler code changes
-
----
-
 # Context Management: Deadlines & Cancellation
 
 ```go
@@ -306,6 +263,115 @@ Client <──[x-served-by: chat-server-5md2x]─── Server
 - **Traces**: `traceparent` propagated via OTEL, enables end-to-end tracing
 - **Pod identity**: `x-served-by` in trailing metadata, visible in TUI event log
 - Metadata flows through interceptors without touching handler code
+
+---
+
+# Health Checking & Reflection
+
+`server/src/chat_server/main.py`
+
+```python
+# Standard gRPC health protocol
+health_servicer = health.HealthServicer()
+health_servicer.set("chat.v1.ChatService", SERVING)
+```
+
+- Kubernetes 1.24+ supports native gRPC health probes
+
+```yaml
+# deploy/base/server-deployment.yaml -- K8s native gRPC probe
+readinessProbe:
+  grpc:
+    port: 50051
+```
+
+*`make grpcurl-health`* -- uses gRPC health protocol to check server health
+
+---
+
+# Reflection
+
+```python
+# Self-documenting service
+reflection.enable_server_reflection(service_names, server)
+```
+
+- Reflection lets `grpcurl` discover services at runtime
+
+*`make grpcurl-list`* - lists services and methods via reflection
+
+---
+
+# Interceptors
+
+Our interceptor chain: `server/src/chat_server/main.py`
+
+```python
+interceptors = [LoggingInterceptor()]      # Outermost: sees everything
+if settings.auth_enabled:
+    interceptors.append(AuthInterceptor())  # Rejects early
+if settings.otel_enabled:
+    interceptors.append(OTelInterceptor())  # Traces
+interceptors.append(PrometheusInterceptor()) # Metrics
+```
+
+Each interceptor wraps the handler via `intercept_service`:
+- Inspect metadata, request, response
+- Works for both unary AND streaming RPCs
+- Add/remove via config -- zero handler code changes
+
+- Jaeger UI: http://localhost:16686
+- Prometheus: http://localhost:9090
+
+---
+
+# gRPC Load Balancing: Three Approaches
+
+```
+1. Client-side    Client ──────────────> Servers  (client decides)
+
+2. Proxy-level    Client ──> Envoy ──> Servers    (proxy decides)
+
+3. xDS / Proxyless  Client ──────────> Servers    (client decides,
+                       ↑                           control plane advises)
+                       └── xDS control plane (e.g. Istio)
+```
+
+**Client-side** (built into gRPC):
+- `pick_first` (default): one backend, failover on error -- our gRPC namespace
+- `round_robin`: rotate across all resolved IPs -- needs headless service
+- No extra hop, lowest latency, but every client needs service discovery
+
+**Proxy-level** (Envoy):
+- Per-RPC balancing, mTLS, retries, observability -- our Envoy namespace
+- Extra hop, but centralizes complexity
+
+**xDS / Proxyless mesh** (Google-scale):
+- Client speaks xDS protocol to control plane (Istio's istiod)
+- Client-side performance + centralized policy. No proxy hop.
+
+---
+
+# Demo: Unified TUI -- One Client, Four Modes
+
+```bash
+make client  # Single command, two gRPC connections, four tabs
+```
+
+```
+┌─[gRPC Unary]─[gRPC Stream]─[Envoy Unary]─[Envoy Stream]─┐
+│  Chat (gRPC Stream)     │  gRPC Event Log                 │
+│  You: Hey               │  → UserMessage "Hey"            │
+│  AI: Hello! ...         │  ← StatusUpdate GENERATING      │
+├─────────────────────────┴─────────────────────────────────┤
+│ gRPC Stream | pod: chat-server-abc | streaming            │
+└───────────────────────────────────────────────────────────┘
+```
+
+- **Tab** cycles: gRPC Unary → gRPC Stream → Envoy Unary → Envoy Stream
+- Two connections (plaintext + mTLS) share HTTP/2 multiplexing
+- Background streams keep running when tabbed away
+- Each tab has independent chat history and event log
 
 ---
 
@@ -354,32 +420,6 @@ make client
 
 Same server, same proto, three access patterns.
 Gateway for quick integration; native gRPC for streaming.
-
----
-
-# Health Checking & Reflection
-
-`server/src/chat_server/main.py`
-
-```python
-# Standard gRPC health protocol
-health_servicer = health.HealthServicer()
-health_servicer.set("chat.v1.ChatService", SERVING)
-
-# Self-documenting service
-reflection.enable_server_reflection(service_names, server)
-```
-
-```yaml
-# deploy/base/server-deployment.yaml -- K8s native gRPC probe
-readinessProbe:
-  grpc:
-    port: 50051
-```
-
-- Kubernetes 1.24+ supports native gRPC health probes
-- Reflection lets `grpcurl` discover services at runtime
-- Health + reflection = observable, debuggable services out of the box
 
 ---
 
