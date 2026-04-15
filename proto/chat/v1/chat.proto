@@ -22,8 +22,8 @@ service ChatService {
 // --- Unary messages ---
 
 message SendMessageRequest {
-  string ConveresationID = 1;
-  bool   text            = 2;
+  string conversation_id = 1;
+  string text            = 2;
 }
 
 message SendMessageResponse {
